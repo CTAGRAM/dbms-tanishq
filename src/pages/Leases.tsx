@@ -10,9 +10,11 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye } from "lucide-react";
+import { Eye, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddLeaseDialog } from "@/components/leases/AddLeaseDialog";
+import { ViewLeaseDialog } from "@/components/leases/ViewLeaseDialog";
+import { TerminateLeaseDialog } from "@/components/leases/TerminateLeaseDialog";
 
 interface Lease {
   lease_id: string;
@@ -32,13 +34,25 @@ interface Lease {
   tenant: {
     profiles: {
       full_name: string;
+      email: string;
+      phone: string;
     };
   };
+  payment?: Array<{
+    payment_id: string;
+    amount: number;
+    due_date: string;
+    status: string;
+    paid_at: string | null;
+  }>;
 }
 
 export default function Leases() {
   const [leases, setLeases] = useState<Lease[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewingLease, setViewingLease] = useState<Lease | null>(null);
+  const [terminatingLeaseId, setTerminatingLeaseId] = useState<string | null>(null);
+  const [terminatingUnitId, setTerminatingUnitId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLeases();
@@ -51,7 +65,8 @@ export default function Leases() {
         .select(`
           *,
           unit (name, property (address)),
-          tenant (profiles (full_name))
+          tenant (profiles (full_name, email, phone)),
+          payment (payment_id, amount, due_date, status, paid_at)
         `)
         .order("created_at", { ascending: false });
 
@@ -62,6 +77,11 @@ export default function Leases() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTerminate = (leaseId: string, unitId: string) => {
+    setTerminatingLeaseId(leaseId);
+    setTerminatingUnitId(unitId);
   };
 
   const getStatusBadge = (status: string) => {
@@ -131,9 +151,24 @@ export default function Leases() {
                   <TableCell>${lease.monthly_rent.toFixed(2)}</TableCell>
                   <TableCell>{getStatusBadge(lease.status)}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon">
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setViewingLease(lease)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {lease.status === "active" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleTerminate(lease.lease_id, lease.unit_id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -141,6 +176,25 @@ export default function Leases() {
           </TableBody>
         </Table>
       </div>
+
+      <ViewLeaseDialog
+        lease={viewingLease}
+        open={!!viewingLease}
+        onOpenChange={(open) => !open && setViewingLease(null)}
+      />
+
+      <TerminateLeaseDialog
+        leaseId={terminatingLeaseId}
+        unitId={terminatingUnitId}
+        open={!!terminatingLeaseId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTerminatingLeaseId(null);
+            setTerminatingUnitId(null);
+          }
+        }}
+        onSuccess={fetchLeases}
+      />
     </div>
   );
 }

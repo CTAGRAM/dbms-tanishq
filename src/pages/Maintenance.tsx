@@ -9,8 +9,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Edit } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddMaintenanceDialog } from "@/components/maintenance/AddMaintenanceDialog";
+import { UpdateStatusDialog } from "@/components/maintenance/UpdateStatusDialog";
 
 interface MaintenanceRequest {
   request_id: string;
@@ -33,6 +36,8 @@ interface MaintenanceRequest {
 export default function Maintenance() {
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
+  const [updatingRequestStatus, setUpdatingRequestStatus] = useState<string>("");
 
   useEffect(() => {
     fetchRequests();
@@ -95,6 +100,7 @@ export default function Maintenance() {
               <TableHead>Status</TableHead>
               <TableHead>Est. Cost</TableHead>
               <TableHead>Created</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -112,7 +118,7 @@ export default function Maintenance() {
               ))
             ) : requests.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                   No maintenance requests found. Create your first request to get started.
                 </TableCell>
               </TableRow>
@@ -135,12 +141,32 @@ export default function Maintenance() {
                     {request.estimated_cost ? `$${request.estimated_cost.toFixed(2)}` : "-"}
                   </TableCell>
                   <TableCell>{new Date(request.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setUpdatingRequestId(request.request_id);
+                        setUpdatingRequestStatus(request.status);
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </div>
+
+      <UpdateStatusDialog
+        requestId={updatingRequestId}
+        currentStatus={updatingRequestStatus}
+        open={!!updatingRequestId}
+        onOpenChange={(open) => !open && setUpdatingRequestId(null)}
+        onSuccess={fetchRequests}
+      />
     </div>
   );
 }

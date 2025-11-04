@@ -9,24 +9,32 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, Edit, Mail, Phone } from "lucide-react";
+import { Edit, Mail, Phone } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AddTenantDialog } from "@/components/tenants/AddTenantDialog";
+import { EditTenantDialog } from "@/components/tenants/EditTenantDialog";
 
 interface Tenant {
   tenant_id: string;
   profile_id: string;
-  occupation: string;
+  occupation: string | null;
+  annual_income: number | null;
+  credit_score: number | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
   created_at: string;
   profiles: {
     full_name: string;
     email: string;
-    phone: string;
+    phone: string | null;
   };
 }
 
 export default function Tenants() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchTenants();
@@ -51,6 +59,11 @@ export default function Tenants() {
     }
   };
 
+  const handleEdit = (tenant: Tenant) => {
+    setEditingTenant(tenant);
+    setEditDialogOpen(true);
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -58,10 +71,7 @@ export default function Tenants() {
           <h1 className="text-3xl font-bold tracking-tight">Tenants</h1>
           <p className="text-muted-foreground mt-1">Manage tenant information</p>
         </div>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Tenant
-        </Button>
+        <AddTenantDialog onSuccess={fetchTenants} />
       </div>
 
       <div className="border rounded-lg">
@@ -113,14 +123,13 @@ export default function Tenants() {
                   <TableCell>{tenant.occupation || "N/A"}</TableCell>
                   <TableCell>{new Date(tenant.created_at).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="icon">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(tenant)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -128,6 +137,13 @@ export default function Tenants() {
           </TableBody>
         </Table>
       </div>
+
+      <EditTenantDialog
+        tenant={editingTenant}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSuccess={fetchTenants}
+      />
     </div>
   );
 }
