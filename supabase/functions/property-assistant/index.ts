@@ -16,27 +16,33 @@ serve(async (req) => {
     const { message } = await req.json();
     const authHeader = req.headers.get('Authorization');
     
-    // Initialize Supabase client
-    const supabase = createClient(
+    // Initialize Supabase client with user auth for verification
+    const supabaseUser = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader! } } }
     );
 
-    // Fetch current user stats
-    const { data: { user } } = await supabase.auth.getUser();
+    // Verify user is authenticated
+    const { data: { user } } = await supabaseUser.auth.getUser();
     if (!user) {
       throw new Error('Unauthorized');
     }
 
-    // Fetch aggregated data
+    // Initialize Supabase client with SERVICE ROLE for full database access
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Fetch comprehensive data with full access
     const [properties, units, leases, tenants, payments, maintenance] = await Promise.all([
       supabase.from("property").select("*", { count: "exact" }),
-      supabase.from("unit").select("*, property(address)", { count: "exact" }),
-      supabase.from("lease").select("*, tenant(profile_id), unit(name)", { count: "exact" }),
-      supabase.from("tenant").select("*", { count: "exact" }),
+      supabase.from("unit").select("*, property(address, city, state, type)", { count: "exact" }),
+      supabase.from("lease").select("*, tenant(profiles(full_name, email)), unit(name, property(address))", { count: "exact" }),
+      supabase.from("tenant").select("*, profiles(full_name, email)", { count: "exact" }),
       supabase.from("payment").select("*", { count: "exact" }),
-      supabase.from("maintenance_request").select("*", { count: "exact" }),
+      supabase.from("maintenance_request").select("*, unit(name, property(address))", { count: "exact" }),
     ]);
 
     const stats = {
@@ -63,16 +69,37 @@ serve(async (req) => {
       resolvedMaintenance: maintenance.data?.filter((m: any) => m.status === "resolved").length || 0,
     };
 
-    // Build context for AI
-    const context = `
-You are a helpful real estate management assistant with access to the following current data:
+    // Build detailed property list
+    const propertyList = properties.data?.map((p: any) => 
+      `${p.address}, ${p.city}, ${p.state} (${p.type}, ${p.status})`
+    ).join('\n') || 'No properties';
 
-PROPERTIES & UNITS:
+    // Build detailed unit list
+    const unitList = units.data?.map((u: any) => 
+      `Unit ${u.name} at ${u.property?.address || 'Unknown'} - ${u.status} ($${u.rent_amount}/month)`
+    ).join('\n') || 'No units';
+
+    // Build tenant list
+    const tenantList = tenants.data?.map((t: any) => 
+      `${t.profiles?.full_name || 'Unknown'} (${t.profiles?.email || 'No email'})`
+    ).join('\n') || 'No tenants';
+
+    // Build context for AI with full details
+    const context = `
+You are a helpful real estate management assistant with FULL ACCESS to all database information.
+
+PROPERTIES & UNITS SUMMARY:
 - Total Properties: ${stats.totalProperties}
 - Total Units: ${stats.totalUnits}
 - Available Units: ${stats.availableUnits}
 - Leased Units: ${stats.leasedUnits}
 - Occupancy Rate: ${((stats.leasedUnits / stats.totalUnits) * 100).toFixed(1)}%
+
+DETAILED PROPERTY LIST:
+${propertyList}
+
+DETAILED UNIT LIST (with availability):
+${unitList}
 
 LEASES:
 - Total Leases: ${stats.totalLeases}
@@ -80,8 +107,8 @@ LEASES:
 - Draft Leases: ${stats.draftLeases}
 - Terminated Leases: ${stats.terminatedLeases}
 
-TENANTS:
-- Total Tenants: ${stats.totalTenants}
+TENANTS (${stats.totalTenants} total):
+${tenantList}
 
 PAYMENTS:
 - Total Payments: ${stats.totalPayments}
@@ -96,7 +123,9 @@ MAINTENANCE:
 - In Progress: ${stats.inProgressMaintenance}
 - Resolved: ${stats.resolvedMaintenance}
 
-Answer the user's question based on this data. Be concise and helpful. Format numbers clearly.
+You have access to ALL property addresses, unit details, tenant information, and can answer specific questions about individual properties, units, and availability. 
+
+Answer the user's question based on this comprehensive data. Be specific when asked about individual properties or units. Format numbers clearly.
 `;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
