@@ -7,7 +7,9 @@ import {
   Wrench,
   BarChart3,
   Settings,
+  Database,
 } from "lucide-react";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -29,6 +31,7 @@ const items = [
   { title: "Payments", url: "/payments", icon: DollarSign },
   { title: "Maintenance", url: "/maintenance", icon: Wrench },
   { title: "Reports", url: "/reports", icon: BarChart3 },
+  { title: "DBMS Lab", url: "/dbms-lab", icon: Database },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
@@ -42,6 +45,9 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
+        <div className="px-3 py-2">
+          <GlobalSearch />
+        </div>
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs uppercase tracking-wider text-sidebar-foreground/60 px-3">
             Main Menu

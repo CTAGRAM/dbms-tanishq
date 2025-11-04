@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Users, FileText, AlertCircle, DollarSign, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PropertyAssistant } from "@/components/PropertyAssistant";
 
 interface DashboardStats {
   totalProperties: number;
@@ -180,6 +181,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <PropertyAssistant />
     </div>
   );
 }

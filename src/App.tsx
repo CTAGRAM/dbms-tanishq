@@ -12,6 +12,7 @@ import Payments from "./pages/Payments";
 import Maintenance from "./pages/Maintenance";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import DBMSLab from "./pages/DBMSLab";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/payments" element={<Payments />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/dbms-lab" element={<DBMSLab />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

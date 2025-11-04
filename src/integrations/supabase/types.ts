@@ -290,6 +290,13 @@ export type Database = {
             referencedRelation: "lease"
             referencedColumns: ["lease_id"]
           },
+          {
+            foreignKeyName: "payment_lease_id_fkey"
+            columns: ["lease_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_lease_view"
+            referencedColumns: ["lease_id"]
+          },
         ]
       }
       profiles: {
@@ -458,6 +465,20 @@ export type Database = {
             foreignKeyName: "unit_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
+            referencedRelation: "monthly_revenue_by_property"
+            referencedColumns: ["property_id"]
+          },
+          {
+            foreignKeyName: "unit_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "owner_property_view"
+            referencedColumns: ["property_id"]
+          },
+          {
+            foreignKeyName: "unit_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
             referencedRelation: "property"
             referencedColumns: ["property_id"]
           },
@@ -494,9 +515,93 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      monthly_revenue_by_property: {
+        Row: {
+          address: string | null
+          avg_payment: number | null
+          city: string | null
+          lease_count: number | null
+          month: string | null
+          property_id: string | null
+          state: string | null
+          total_revenue: number | null
+        }
+        Relationships: []
+      }
+      ops_maintenance_view: {
+        Row: {
+          actual_cost: number | null
+          category: Database["public"]["Enums"]["maintenance_category"] | null
+          city: string | null
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          estimated_cost: number | null
+          priority: number | null
+          property_address: string | null
+          request_id: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["maintenance_status"] | null
+          unit_name: string | null
+        }
+        Relationships: []
+      }
+      owner_property_view: {
+        Row: {
+          address: string | null
+          city: string | null
+          created_at: string | null
+          property_id: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["property_status"] | null
+          type: Database["public"]["Enums"]["property_type"] | null
+          zip_code: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          created_at?: string | null
+          property_id?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["property_status"] | null
+          type?: Database["public"]["Enums"]["property_type"] | null
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          created_at?: string | null
+          property_id?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["property_status"] | null
+          type?: Database["public"]["Enums"]["property_type"] | null
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
+      tenant_lease_view: {
+        Row: {
+          address: string | null
+          bathrooms: number | null
+          bedrooms: number | null
+          city: string | null
+          end_date: string | null
+          lease_id: string | null
+          monthly_rent: number | null
+          start_date: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["lease_status"] | null
+          unit_name: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      calculate_late_fee: {
+        Args: { amount: number; due_date: string }
+        Returns: number
+      }
+      get_current_isolation_level: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -518,6 +623,14 @@ export type Database = {
           p_status?: string
         }
         Returns: number
+      }
+      process_overdue_payments: {
+        Args: never
+        Returns: {
+          late_fee: number
+          payment_id: string
+          status: string
+        }[]
       }
       sp_confirm_lease: {
         Args: {
