@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Copy, ChevronDown, ChevronRight, Trash2, Filter, Terminal } from "lucide-react";
+import { Copy, ChevronDown, ChevronRight, Trash2, Filter, Terminal, Activity } from "lucide-react";
 import { toast } from "sonner";
 
 interface AuditLog {
@@ -35,6 +35,8 @@ export const OperationsConsole = ({ open, onOpenChange }: OperationsConsoleProps
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [expandedLogs, setExpandedLogs] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState<string>("all");
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [stats, setStats] = useState({ total: 0, success: 0, errors: 0 });
 
   useEffect(() => {
     // Subscribe to real-time audit log updates
@@ -48,7 +50,15 @@ export const OperationsConsole = ({ open, onOpenChange }: OperationsConsoleProps
           table: "audit_log",
         },
         (payload) => {
-          setLogs((prev) => [payload.new as AuditLog, ...prev].slice(0, 100));
+          const newLog = payload.new as AuditLog;
+          setLogs((prev) => [newLog, ...prev].slice(0, 100));
+          
+          // Update stats
+          setStats(prev => ({
+            total: prev.total + 1,
+            success: prev.success + (newLog.status === 'success' ? 1 : 0),
+            errors: prev.errors + (newLog.status === 'error' ? 1 : 0)
+          }));
         }
       )
       .subscribe();
@@ -60,6 +70,13 @@ export const OperationsConsole = ({ open, onOpenChange }: OperationsConsoleProps
       supabase.removeChannel(channel);
     };
   }, []);
+
+  useEffect(() => {
+    // Calculate stats whenever logs change
+    const successCount = logs.filter(l => l.status === 'success').length;
+    const errorCount = logs.filter(l => l.status === 'error').length;
+    setStats({ total: logs.length, success: successCount, errors: errorCount });
+  }, [logs]);
 
   const fetchLogs = async () => {
     const { data, error } = await supabase
@@ -118,6 +135,16 @@ export const OperationsConsole = ({ open, onOpenChange }: OperationsConsoleProps
     );
   };
 
+  const getCorrelationColor = (correlationId: string | null) => {
+    if (!correlationId) return "text-console-text/40";
+    const colors = [
+      "text-blue-400", "text-green-400", "text-yellow-400", 
+      "text-purple-400", "text-pink-400", "text-cyan-400"
+    ];
+    const hash = correlationId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  };
+
   const filteredLogs = logs.filter((log) => {
     if (filter === "all") return true;
     if (filter === "writes") return ["INSERT", "UPDATE", "DELETE"].includes(log.op);
@@ -128,9 +155,12 @@ export const OperationsConsole = ({ open, onOpenChange }: OperationsConsoleProps
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[600px] bg-console-bg border-l border-console-border p-0 sm:max-w-[600px]">
-        <SheetHeader className="border-b border-console-border px-6 py-4">
+        <SheetHeader className="border-b border-console-border px-6 py-4 space-y-3">
           <div className="flex items-center justify-between">
-            <SheetTitle className="text-console-text">Operations Console</SheetTitle>
+            <SheetTitle className="text-console-text flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Operations Console
+            </SheetTitle>
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
@@ -150,6 +180,30 @@ export const OperationsConsole = ({ open, onOpenChange }: OperationsConsoleProps
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
+          </div>
+          
+          {/* Statistics */}
+          <div className="flex items-center gap-4 text-xs text-console-text/70">
+            <div className="flex items-center gap-1">
+              <span className="font-medium">{stats.total}</span>
+              <span>operations</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-accent">{stats.success}</span>
+              <span>success</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-destructive">{stats.errors}</span>
+              <span>errors</span>
+            </div>
+            {stats.total > 0 && (
+              <div className="flex items-center gap-1 ml-auto">
+                <span>Success rate:</span>
+                <span className="font-medium">
+                  {Math.round((stats.success / stats.total) * 100)}%
+                </span>
+              </div>
+            )}
           </div>
         </SheetHeader>
 
@@ -186,7 +240,7 @@ export const OperationsConsole = ({ open, onOpenChange }: OperationsConsoleProps
                             {log.object_type}
                           </span>
                           {log.correlation_id && (
-                            <span className="text-xs font-mono text-console-text/40">
+                            <span className={`text-xs font-mono ${getCorrelationColor(log.correlation_id)}`}>
                               #{log.correlation_id.slice(0, 8)}
                             </span>
                           )}

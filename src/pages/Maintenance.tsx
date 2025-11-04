@@ -10,7 +10,15 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit } from "lucide-react";
+import { Edit, Sparkles } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { generateRandomMaintenance } from "@/lib/seedData";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddMaintenanceDialog } from "@/components/maintenance/AddMaintenanceDialog";
 import { UpdateStatusDialog } from "@/components/maintenance/UpdateStatusDialog";
@@ -62,6 +70,35 @@ export default function Maintenance() {
     }
   };
 
+  const generateRandomRequests = async (count: number) => {
+    try {
+      // Get all units
+      const { data: units, error: unitsError } = await supabase
+        .from("unit")
+        .select("unit_id");
+
+      if (unitsError) throw unitsError;
+      if (!units || units.length === 0) {
+        toast.error("No units available. Please add properties with units first.");
+        return;
+      }
+
+      const requests = Array.from({ length: count }, () => 
+        generateRandomMaintenance(units[Math.floor(Math.random() * units.length)].unit_id)
+      );
+      
+      const { error } = await supabase.from("maintenance_request").insert(requests);
+      
+      if (error) throw error;
+      
+      toast.success(`Generated ${count} random maintenance requests`);
+      fetchRequests();
+    } catch (error) {
+      console.error("Error generating maintenance requests:", error);
+      toast.error("Failed to generate maintenance requests");
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
       open: "bg-warning text-warning-foreground",
@@ -86,7 +123,28 @@ export default function Maintenance() {
           <h1 className="text-3xl font-bold tracking-tight">Maintenance</h1>
           <p className="text-muted-foreground mt-1">Manage maintenance requests and repairs</p>
         </div>
-        <AddMaintenanceDialog onSuccess={fetchRequests} />
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                Generate Sample Data
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => generateRandomRequests(5)}>
+                Add 5 Random Requests
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => generateRandomRequests(10)}>
+                Add 10 Random Requests
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => generateRandomRequests(20)}>
+                Add 20 Random Requests
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <AddMaintenanceDialog onSuccess={fetchRequests} />
+        </div>
       </div>
 
       <div className="border rounded-lg">

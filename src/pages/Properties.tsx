@@ -10,7 +10,15 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Edit, Trash2 } from "lucide-react";
+import { Eye, Edit, Trash2, Sparkles } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { generateRandomProperty } from "@/lib/seedData";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddPropertyDialog } from "@/components/properties/AddPropertyDialog";
 import { EditPropertyDialog } from "@/components/properties/EditPropertyDialog";
@@ -55,6 +63,21 @@ export default function Properties() {
     }
   };
 
+  const generateRandomProperties = async (count: number) => {
+    try {
+      const properties = Array.from({ length: count }, () => generateRandomProperty());
+      const { error } = await supabase.from("property").insert(properties);
+      
+      if (error) throw error;
+      
+      toast.success(`Generated ${count} random properties`);
+      fetchProperties();
+    } catch (error) {
+      console.error("Error generating properties:", error);
+      toast.error("Failed to generate properties");
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
       active: "bg-accent text-accent-foreground",
@@ -71,7 +94,28 @@ export default function Properties() {
           <h1 className="text-3xl font-bold tracking-tight">Properties</h1>
           <p className="text-muted-foreground mt-1">Manage your real estate portfolio</p>
         </div>
-        <AddPropertyDialog onSuccess={fetchProperties} />
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                Generate Sample Data
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => generateRandomProperties(5)}>
+                Add 5 Random Properties
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => generateRandomProperties(10)}>
+                Add 10 Random Properties
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => generateRandomProperties(20)}>
+                Add 20 Random Properties
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <AddPropertyDialog onSuccess={fetchProperties} />
+        </div>
       </div>
 
       <div className="border rounded-lg">

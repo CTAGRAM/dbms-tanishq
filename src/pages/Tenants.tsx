@@ -9,7 +9,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit, Mail, Phone } from "lucide-react";
+import { Edit, Mail, Phone, Sparkles } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { generateRandomTenant } from "@/lib/seedData";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddTenantDialog } from "@/components/tenants/AddTenantDialog";
 import { EditTenantDialog } from "@/components/tenants/EditTenantDialog";
@@ -59,6 +67,48 @@ export default function Tenants() {
     }
   };
 
+  const generateRandomTenants = async (count: number) => {
+    try {
+      const tenantsData = Array.from({ length: count }, () => generateRandomTenant());
+      
+      // First create profiles, then create tenant records
+      for (const tenantData of tenantsData) {
+        // Create a user/profile first
+        const { data: profile, error: profileError } = await supabase.auth.signUp({
+          email: tenantData.email,
+          password: crypto.randomUUID(),
+          options: {
+            data: {
+              full_name: tenantData.full_name,
+              phone: tenantData.phone
+            }
+          }
+        });
+
+        if (profileError || !profile.user) {
+          console.error("Error creating profile:", profileError);
+          continue;
+        }
+
+        // Create tenant record
+        await supabase.from("tenant").insert({
+          profile_id: profile.user.id,
+          occupation: tenantData.occupation,
+          annual_income: tenantData.annual_income,
+          credit_score: tenantData.credit_score,
+          emergency_contact_name: tenantData.emergency_contact_name,
+          emergency_contact_phone: tenantData.emergency_contact_phone
+        });
+      }
+      
+      toast.success(`Generated ${count} random tenants`);
+      fetchTenants();
+    } catch (error) {
+      console.error("Error generating tenants:", error);
+      toast.error("Failed to generate tenants");
+    }
+  };
+
   const handleEdit = (tenant: Tenant) => {
     setEditingTenant(tenant);
     setEditDialogOpen(true);
@@ -71,7 +121,28 @@ export default function Tenants() {
           <h1 className="text-3xl font-bold tracking-tight">Tenants</h1>
           <p className="text-muted-foreground mt-1">Manage tenant information</p>
         </div>
-        <AddTenantDialog onSuccess={fetchTenants} />
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                Generate Sample Data
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => generateRandomTenants(5)}>
+                Add 5 Random Tenants
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => generateRandomTenants(10)}>
+                Add 10 Random Tenants
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => generateRandomTenants(20)}>
+                Add 20 Random Tenants
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <AddTenantDialog onSuccess={fetchTenants} />
+        </div>
       </div>
 
       <div className="border rounded-lg">
