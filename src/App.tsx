@@ -13,6 +13,8 @@ import Maintenance from "./pages/Maintenance";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import Auth from "./pages/Auth";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -23,7 +25,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route element={<Layout />}>
+          <Route path="/auth" element={<Auth />} />
+          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/properties" element={<Properties />} />
             <Route path="/tenants" element={<Tenants />} />
