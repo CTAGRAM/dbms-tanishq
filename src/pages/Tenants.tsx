@@ -69,28 +69,40 @@ export default function Tenants() {
 
   const generateRandomTenants = async (count: number) => {
     try {
-      const tenantsData = Array.from({ length: count }, () => generateRandomTenant());
+      // Get existing profiles that are not already tenants
+      const { data: existingTenants } = await supabase
+        .from("tenant")
+        .select("profile_id");
       
-      // Insert profiles and tenants directly
-      for (const tenantData of tenantsData) {
-        const profileId = crypto.randomUUID();
-        
-        // Create profile
-        const { error: profileError } = await supabase.from("profiles").insert({
-          id: profileId,
-          full_name: tenantData.full_name,
-          email: tenantData.email,
-          phone: tenantData.phone
-        });
+      const existingTenantProfileIds = new Set(
+        existingTenants?.map(t => t.profile_id) || []
+      );
 
-        if (profileError) {
-          console.error("Error creating profile:", profileError);
-          continue;
-        }
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id");
+      
+      const availableProfiles = profiles?.filter(
+        p => !existingTenantProfileIds.has(p.id)
+      ) || [];
 
-        // Create tenant record
+      if (availableProfiles.length === 0) {
+        toast.error("No available profiles to convert to tenants. Please add users first.");
+        return;
+      }
+
+      const actualCount = Math.min(count, availableProfiles.length);
+      const selectedProfiles = availableProfiles.slice(0, actualCount);
+      
+      const tenantsData = selectedProfiles.map(() => generateRandomTenant());
+      
+      // Create tenant records for existing profiles
+      for (let i = 0; i < selectedProfiles.length; i++) {
+        const tenantData = tenantsData[i];
+        const profile = selectedProfiles[i];
+
         const { error: tenantError } = await supabase.from("tenant").insert({
-          profile_id: profileId,
+          profile_id: profile.id,
           occupation: tenantData.occupation,
           annual_income: tenantData.annual_income,
           credit_score: tenantData.credit_score,
@@ -103,7 +115,7 @@ export default function Tenants() {
         }
       }
       
-      toast.success(`Generated ${count} random tenants`);
+      toast.success(`Generated ${actualCount} random tenants from existing profiles`);
       fetchTenants();
     } catch (error) {
       console.error("Error generating tenants:", error);
