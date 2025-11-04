@@ -46,7 +46,7 @@ export function UnitOne() {
 
       for (const table of tables) {
         const { count } = await supabase
-          .from(table)
+          .from(table as any)
           .select('*', { count: 'exact', head: true });
         counts[table] = count || 0;
       }

@@ -1,1 +1,4 @@
 project_id = "ntkgcoiixbkwyclkmicg"
+
+[functions.property-assistant]
+verify_jwt = true

@@ -203,7 +203,7 @@ export function UnitFour() {
                 Test
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">Scalar function - calculates 5% fee if >5 days overdue</p>
+            <p className="text-xs text-muted-foreground">Scalar function - calculates 5% fee if &gt;5 days overdue</p>
           </div>
 
           <div className="bg-muted/50 p-4 rounded-lg">
