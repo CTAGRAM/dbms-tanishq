@@ -8,6 +8,9 @@ import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { LeaseExpirationsWidget } from "@/components/dashboard/LeaseExpirationsWidget";
 import { MaintenanceWidget } from "@/components/dashboard/MaintenanceWidget";
 import { SparklineChart } from "@/components/charts/SparklineChart";
+import { OccupancyMap } from "@/components/dashboard/OccupancyMap";
+import { TopPerformingProperties } from "@/components/dashboard/TopPerformingProperties";
+import { MarketingFunnel } from "@/components/dashboard/MarketingFunnel";
 
 interface DashboardStats {
   totalProperties: number;
@@ -196,11 +199,19 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <RevenueChart />
+      <div className="grid gap-4 md:grid-cols-2">
+        <RevenueChart />
+        <OccupancyMap />
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <LeaseExpirationsWidget />
         <MaintenanceWidget />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <TopPerformingProperties />
+        <MarketingFunnel />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
