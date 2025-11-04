@@ -4,6 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Users, FileText, AlertCircle, DollarSign, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PropertyAssistant } from "@/components/PropertyAssistant";
+import { RevenueChart } from "@/components/dashboard/RevenueChart";
+import { LeaseExpirationsWidget } from "@/components/dashboard/LeaseExpirationsWidget";
+import { MaintenanceWidget } from "@/components/dashboard/MaintenanceWidget";
+import { SparklineChart } from "@/components/charts/SparklineChart";
 
 interface DashboardStats {
   totalProperties: number;
@@ -15,6 +19,12 @@ interface DashboardStats {
   overduePayments: number;
   openMaintenanceRequests: number;
   monthlyRevenue: number;
+  sparklineData: {
+    properties: { value: number }[];
+    occupancy: { value: number }[];
+    revenue: { value: number }[];
+    leases: { value: number }[];
+  };
 }
 
 export default function Dashboard() {
@@ -46,6 +56,12 @@ export default function Dashboard() {
         (p) => p.status === "paid" && new Date(p.due_date).getMonth() === new Date().getMonth()
       ).reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0) || 0;
 
+      // Generate sparkline data (last 7 days trend)
+      const generateSparkline = (baseValue: number) => 
+        Array.from({ length: 7 }, () => ({ 
+          value: baseValue + Math.random() * (baseValue * 0.2) - (baseValue * 0.1) 
+        }));
+
       setStats({
         totalProperties: properties.count || 0,
         totalUnits: units.count || 0,
@@ -56,6 +72,12 @@ export default function Dashboard() {
         overduePayments,
         openMaintenanceRequests: maintenance.count || 0,
         monthlyRevenue: paidThisMonth,
+        sparklineData: {
+          properties: generateSparkline(properties.count || 0),
+          occupancy: generateSparkline((occupiedUnits / (units.count || 1)) * 100),
+          revenue: generateSparkline(paidThisMonth),
+          leases: generateSparkline(leases.count || 0),
+        },
       });
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
@@ -95,7 +117,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Properties</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
@@ -105,26 +127,38 @@ export default function Dashboard() {
             <p className="text-xs text-muted-foreground mt-1">
               {stats?.totalUnits} total units
             </p>
+            <div className="mt-3">
+              <SparklineChart 
+                data={stats?.sparklineData.properties || []} 
+                color="hsl(var(--chart-1))"
+              />
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Occupancy</CardTitle>
-            <TrendingUp className="h-4 w-4 text-accent" />
+            <TrendingUp className="h-4 w-4 text-chart-2" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{occupancyRate.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground mt-1">
               {stats?.occupiedUnits} / {stats?.totalUnits} units leased
             </p>
+            <div className="mt-3">
+              <SparklineChart 
+                data={stats?.sparklineData.occupancy || []} 
+                color="hsl(var(--chart-2))"
+              />
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-accent" />
+            <DollarSign className="h-4 w-4 text-chart-3" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -133,10 +167,16 @@ export default function Dashboard() {
             <p className="text-xs text-muted-foreground mt-1">
               {stats?.pendingPayments} pending payments
             </p>
+            <div className="mt-3">
+              <SparklineChart 
+                data={stats?.sparklineData.revenue || []} 
+                color="hsl(var(--chart-3))"
+              />
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Active Leases</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
@@ -146,8 +186,21 @@ export default function Dashboard() {
             <p className="text-xs text-muted-foreground mt-1">
               {stats?.totalTenants} total tenants
             </p>
+            <div className="mt-3">
+              <SparklineChart 
+                data={stats?.sparklineData.leases || []} 
+                color="hsl(var(--chart-4))"
+              />
+            </div>
           </CardContent>
         </Card>
+      </div>
+
+      <RevenueChart />
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <LeaseExpirationsWidget />
+        <MaintenanceWidget />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

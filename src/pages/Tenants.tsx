@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit, Mail, Phone, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +13,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddTenantDialog } from "@/components/tenants/AddTenantDialog";
 import { EditTenantDialog } from "@/components/tenants/EditTenantDialog";
+import { TenantCard } from "@/components/tenants/TenantCard";
 
 interface Tenant {
   tenant_id: string;
@@ -35,7 +28,8 @@ interface Tenant {
     full_name: string;
     email: string;
     phone: string | null;
-  };
+    avatar_url: string | null;
+  } | null;
 }
 
 export default function Tenants() {
@@ -54,7 +48,7 @@ export default function Tenants() {
         .from("tenant")
         .select(`
           *,
-          profiles (full_name, email, phone)
+          profiles (full_name, email, phone, avatar_url)
         `)
         .order("created_at", { ascending: false });
 
@@ -159,69 +153,27 @@ export default function Tenants() {
         </div>
       </div>
 
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Occupation</TableHead>
-              <TableHead>Joined</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              [...Array(5)].map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                </TableRow>
-              ))
-            ) : tenants.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
-                  No tenants found. Add your first tenant to get started.
-                </TableCell>
-              </TableRow>
-            ) : (
-              tenants.map((tenant) => (
-                <TableRow key={tenant.tenant_id}>
-                  <TableCell className="font-medium">{tenant.profiles.full_name}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-3 w-3 text-muted-foreground" />
-                      {tenant.profiles.email}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-3 w-3 text-muted-foreground" />
-                      {tenant.profiles.phone || "N/A"}
-                    </div>
-                  </TableCell>
-                  <TableCell>{tenant.occupation || "N/A"}</TableCell>
-                  <TableCell>{new Date(tenant.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEdit(tenant)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {loading ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <Skeleton key={i} className="h-[200px] rounded-lg" />
+          ))}
+        </div>
+      ) : tenants.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground border rounded-lg">
+          No tenants found. Add your first tenant to get started.
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
+          {tenants.map((tenant) => (
+            <TenantCard
+              key={tenant.tenant_id}
+              tenant={tenant}
+              onEdit={() => handleEdit(tenant)}
+            />
+          ))}
+        </div>
+      )}
 
       <EditTenantDialog
         tenant={editingTenant}

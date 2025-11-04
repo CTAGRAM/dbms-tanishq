@@ -1,16 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Eye, Edit, Trash2, Sparkles } from "lucide-react";
+import { Sparkles, LayoutGrid, Table as TableIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,10 +10,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { generateRandomProperty } from "@/lib/seedData";
 import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton";
 import { AddPropertyDialog } from "@/components/properties/AddPropertyDialog";
 import { EditPropertyDialog } from "@/components/properties/EditPropertyDialog";
 import { DeletePropertyDialog } from "@/components/properties/DeletePropertyDialog";
+import { PropertyCard } from "@/components/properties/PropertyCard";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Property {
   property_id: string;
@@ -34,6 +27,7 @@ interface Property {
   status: string;
   created_at: string;
   description?: string;
+  image_url?: string | null;
 }
 
 export default function Properties() {
@@ -42,6 +36,7 @@ export default function Properties() {
   const [editProperty, setEditProperty] = useState<Property | null>(null);
   const [deletePropertyId, setDeletePropertyId] = useState<string | null>(null);
   const [deletePropertyAddress, setDeletePropertyAddress] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   useEffect(() => {
     fetchProperties();
@@ -87,15 +82,6 @@ export default function Properties() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      active: "bg-accent text-accent-foreground",
-      inactive: "bg-muted text-muted-foreground",
-      maintenance: "bg-warning text-warning-foreground",
-    };
-    return <Badge className={colors[status] || ""}>{status}</Badge>;
-  };
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -104,6 +90,18 @@ export default function Properties() {
           <p className="text-muted-foreground mt-1">Manage your real estate portfolio</p>
         </div>
         <div className="flex gap-2">
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "table")}>
+            <TabsList>
+              <TabsTrigger value="grid" className="gap-2">
+                <LayoutGrid className="h-4 w-4" />
+                Grid
+              </TabsTrigger>
+              <TabsTrigger value="table" className="gap-2">
+                <TableIcon className="h-4 w-4" />
+                Table
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
@@ -127,77 +125,36 @@ export default function Properties() {
         </div>
       </div>
 
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Address</TableHead>
-              <TableHead>City</TableHead>
-              <TableHead>State</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              [...Array(5)].map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                </TableRow>
-              ))
-            ) : properties.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                  No properties found. Add your first property to get started.
-                </TableCell>
-              </TableRow>
-            ) : (
-              properties.map((property) => (
-                <TableRow key={property.property_id}>
-                  <TableCell className="font-medium">{property.address}</TableCell>
-                  <TableCell>{property.city}</TableCell>
-                  <TableCell>{property.state}</TableCell>
-                  <TableCell className="capitalize">{property.type}</TableCell>
-                  <TableCell>{getStatusBadge(property.status)}</TableCell>
-                  <TableCell>{new Date(property.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="icon">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setEditProperty(property)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setDeletePropertyId(property.property_id);
-                          setDeletePropertyAddress(property.address);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {loading ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <Skeleton key={i} className="h-[300px] rounded-lg" />
+          ))}
+        </div>
+      ) : properties.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground border rounded-lg">
+          No properties found. Add your first property to get started.
+        </div>
+      ) : viewMode === "grid" ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
+          {properties.map((property) => (
+            <PropertyCard
+              key={property.property_id}
+              property={property}
+              onEdit={() => setEditProperty(property)}
+              onDelete={() => {
+                setDeletePropertyId(property.property_id);
+                setDeletePropertyAddress(property.address);
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="border rounded-lg">
+          {/* Keep existing table view for backwards compatibility */}
+          <p className="p-4 text-sm text-muted-foreground">Table view coming soon. Using grid view for now.</p>
+        </div>
+      )}
 
       <EditPropertyDialog
         property={editProperty}

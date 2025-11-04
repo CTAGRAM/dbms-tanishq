@@ -335,6 +335,9 @@ export type Database = {
           city: string
           created_at: string
           description: string | null
+          image_url: string | null
+          latitude: number | null
+          longitude: number | null
           owner_id: string | null
           property_id: string
           state: string
@@ -348,6 +351,9 @@ export type Database = {
           city: string
           created_at?: string
           description?: string | null
+          image_url?: string | null
+          latitude?: number | null
+          longitude?: number | null
           owner_id?: string | null
           property_id?: string
           state: string
@@ -361,6 +367,9 @@ export type Database = {
           city?: string
           created_at?: string
           description?: string | null
+          image_url?: string | null
+          latitude?: number | null
+          longitude?: number | null
           owner_id?: string | null
           property_id?: string
           state?: string
@@ -376,6 +385,55 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      revenue_history: {
+        Row: {
+          created_at: string | null
+          date: string
+          expenses: number
+          id: string
+          property_id: string | null
+          revenue: number
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          expenses?: number
+          id?: string
+          property_id?: string | null
+          revenue?: number
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          expenses?: number
+          id?: string
+          property_id?: string | null
+          revenue?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revenue_history_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_revenue_by_property"
+            referencedColumns: ["property_id"]
+          },
+          {
+            foreignKeyName: "revenue_history_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "owner_property_view"
+            referencedColumns: ["property_id"]
+          },
+          {
+            foreignKeyName: "revenue_history_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "property"
+            referencedColumns: ["property_id"]
           },
         ]
       }
