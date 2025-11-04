@@ -68,7 +68,20 @@ export function AddPropertyDialog({ onSuccess }: AddPropertyDialogProps) {
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-      const { error } = await supabase.from("property").insert([data as any]);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const propertyData = {
+        address: data.address,
+        city: data.city,
+        state: data.state,
+        zip_code: data.zip_code,
+        type: data.type,
+        status: data.status,
+        description: data.description,
+        owner_id: user?.id
+      };
+      
+      const { error } = await supabase.from("property").insert([propertyData]);
 
       if (error) throw error;
 
