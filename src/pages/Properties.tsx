@@ -65,7 +65,16 @@ export default function Properties() {
 
   const generateRandomProperties = async (count: number) => {
     try {
-      const properties = Array.from({ length: count }, () => generateRandomProperty());
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("You must be logged in to generate properties");
+        return;
+      }
+
+      const properties = Array.from({ length: count }, () => ({
+        ...generateRandomProperty(),
+        owner_id: user.id
+      }));
       const { error } = await supabase.from("property").insert(properties);
       
       if (error) throw error;
