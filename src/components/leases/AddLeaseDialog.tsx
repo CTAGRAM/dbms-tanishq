@@ -74,7 +74,7 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
 
   const fetchUnitsAndTenants = async () => {
     try {
-      const [{ data: unitsData }, { data: tenantsData }] = await Promise.all([
+      const [{ data: unitsData, error: unitsError }, { data: tenantsData, error: tenantsError }] = await Promise.all([
         supabase
           .from("unit")
           .select("unit_id, name, property_id, rent_amount, property(address)")
@@ -85,10 +85,41 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
           .order("created_at", { ascending: false }),
       ]);
 
+      if (unitsError) {
+        console.error("Units error:", unitsError);
+        toast({
+          title: "Error loading units",
+          description: unitsError.message,
+          variant: "destructive",
+        });
+      }
+
+      if (tenantsError) {
+        console.error("Tenants error:", tenantsError);
+        toast({
+          title: "Error loading tenants", 
+          description: tenantsError.message,
+          variant: "destructive",
+        });
+      }
+
       setUnits(unitsData || []);
       setTenants(tenantsData || []);
+      
+      if (!unitsData?.length || !tenantsData?.length) {
+        toast({
+          title: "Missing data",
+          description: !unitsData?.length ? "No available units found. Please add properties with units first." : "No tenants found. Please add tenants first.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load units and tenants",
+        variant: "destructive",
+      });
     }
   };
 
