@@ -10,11 +10,19 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, X } from "lucide-react";
+import { Eye, X, Sparkles } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddLeaseDialog } from "@/components/leases/AddLeaseDialog";
 import { ViewLeaseDialog } from "@/components/leases/ViewLeaseDialog";
 import { TerminateLeaseDialog } from "@/components/leases/TerminateLeaseDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { generateRandomLease } from "@/lib/seedData";
+import { toast } from "sonner";
 
 interface Lease {
   lease_id: string;
@@ -84,6 +92,42 @@ export default function Leases() {
     setTerminatingUnitId(unitId);
   };
 
+  const generateRandomLeases = async (count: number) => {
+    try {
+      // Get available units and tenants
+      const { data: units } = await supabase
+        .from("unit")
+        .select("unit_id")
+        .eq("status", "AVAILABLE")
+        .limit(count);
+
+      const { data: tenants } = await supabase
+        .from("tenant")
+        .select("tenant_id")
+        .limit(count);
+
+      if (!units?.length || !tenants?.length) {
+        toast.error("Need available units and tenants to create leases");
+        return;
+      }
+
+      const leasesToCreate = Math.min(count, units.length, tenants.length);
+      const leasesData = Array.from({ length: leasesToCreate }, (_, i) =>
+        generateRandomLease(units[i].unit_id, tenants[i].tenant_id)
+      );
+
+      const { error } = await supabase.from("lease").insert(leasesData);
+
+      if (error) throw error;
+
+      toast.success(`Generated ${leasesToCreate} random leases`);
+      fetchLeases();
+    } catch (error) {
+      console.error("Error generating leases:", error);
+      toast.error("Failed to generate leases");
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
       draft: "bg-muted text-muted-foreground",
@@ -101,7 +145,28 @@ export default function Leases() {
           <h1 className="text-3xl font-bold tracking-tight">Leases</h1>
           <p className="text-muted-foreground mt-1">Manage lease agreements and contracts</p>
         </div>
-        <AddLeaseDialog onSuccess={fetchLeases} />
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                Generate Sample Data
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => generateRandomLeases(5)}>
+                Add 5 Random Leases
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => generateRandomLeases(10)}>
+                Add 10 Random Leases
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => generateRandomLeases(20)}>
+                Add 20 Random Leases
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <AddLeaseDialog onSuccess={fetchLeases} />
+        </div>
       </div>
 
       <div className="border rounded-lg">

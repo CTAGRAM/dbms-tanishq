@@ -71,34 +71,36 @@ export default function Tenants() {
     try {
       const tenantsData = Array.from({ length: count }, () => generateRandomTenant());
       
-      // First create profiles, then create tenant records
+      // Insert profiles and tenants directly
       for (const tenantData of tenantsData) {
-        // Create a user/profile first
-        const { data: profile, error: profileError } = await supabase.auth.signUp({
+        const profileId = crypto.randomUUID();
+        
+        // Create profile
+        const { error: profileError } = await supabase.from("profiles").insert({
+          id: profileId,
+          full_name: tenantData.full_name,
           email: tenantData.email,
-          password: crypto.randomUUID(),
-          options: {
-            data: {
-              full_name: tenantData.full_name,
-              phone: tenantData.phone
-            }
-          }
+          phone: tenantData.phone
         });
 
-        if (profileError || !profile.user) {
+        if (profileError) {
           console.error("Error creating profile:", profileError);
           continue;
         }
 
         // Create tenant record
-        await supabase.from("tenant").insert({
-          profile_id: profile.user.id,
+        const { error: tenantError } = await supabase.from("tenant").insert({
+          profile_id: profileId,
           occupation: tenantData.occupation,
           annual_income: tenantData.annual_income,
           credit_score: tenantData.credit_score,
           emergency_contact_name: tenantData.emergency_contact_name,
           emergency_contact_phone: tenantData.emergency_contact_phone
         });
+
+        if (tenantError) {
+          console.error("Error creating tenant:", tenantError);
+        }
       }
       
       toast.success(`Generated ${count} random tenants`);

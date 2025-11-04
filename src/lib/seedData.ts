@@ -54,3 +54,20 @@ export const generateRandomMaintenance = (unitId: string) => {
     estimated_cost: randomInt(50, 1000)
   };
 };
+
+export const generateRandomLease = (unitId: string, tenantId: string) => {
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - randomInt(0, 12));
+  const endDate = new Date(startDate);
+  endDate.setFullYear(endDate.getFullYear() + randomInt(1, 2));
+  
+  return {
+    unit_id: unitId,
+    tenant_id: tenantId,
+    start_date: startDate.toISOString().split('T')[0],
+    end_date: endDate.toISOString().split('T')[0],
+    monthly_rent: randomInt(800, 3500),
+    deposit: randomInt(1000, 5000),
+    status: random(["draft", "active"] as const) as "draft" | "active"
+  };
+};
