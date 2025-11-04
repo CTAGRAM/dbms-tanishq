@@ -8,24 +8,32 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, Edit, Trash } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Eye, Edit, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AddPropertyDialog } from "@/components/properties/AddPropertyDialog";
+import { EditPropertyDialog } from "@/components/properties/EditPropertyDialog";
+import { DeletePropertyDialog } from "@/components/properties/DeletePropertyDialog";
 
 interface Property {
   property_id: string;
   address: string;
   city: string;
   state: string;
+  zip_code: string;
   type: string;
   status: string;
   created_at: string;
+  description?: string;
 }
 
 export default function Properties() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editProperty, setEditProperty] = useState<Property | null>(null);
+  const [deletePropertyId, setDeletePropertyId] = useState<string | null>(null);
+  const [deletePropertyAddress, setDeletePropertyAddress] = useState("");
 
   useEffect(() => {
     fetchProperties();
@@ -63,10 +71,7 @@ export default function Properties() {
           <h1 className="text-3xl font-bold tracking-tight">Properties</h1>
           <p className="text-muted-foreground mt-1">Manage your real estate portfolio</p>
         </div>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Property
-        </Button>
+        <AddPropertyDialog onSuccess={fetchProperties} />
       </div>
 
       <div className="border rounded-lg">
@@ -115,11 +120,22 @@ export default function Properties() {
                       <Button variant="ghost" size="icon">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setEditProperty(property)}
+                      >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon">
-                        <Trash className="h-4 w-4" />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setDeletePropertyId(property.property_id);
+                          setDeletePropertyAddress(property.address);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
@@ -129,6 +145,21 @@ export default function Properties() {
           </TableBody>
         </Table>
       </div>
+
+      <EditPropertyDialog
+        property={editProperty}
+        open={!!editProperty}
+        onOpenChange={(open) => !open && setEditProperty(null)}
+        onSuccess={fetchProperties}
+      />
+
+      <DeletePropertyDialog
+        propertyId={deletePropertyId}
+        propertyAddress={deletePropertyAddress}
+        open={!!deletePropertyId}
+        onOpenChange={(open) => !open && setDeletePropertyId(null)}
+        onSuccess={fetchProperties}
+      />
     </div>
   );
 }
