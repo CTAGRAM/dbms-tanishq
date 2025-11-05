@@ -11,6 +11,7 @@ import { SparklineChart } from "@/components/charts/SparklineChart";
 import { OccupancyMap } from "@/components/dashboard/OccupancyMap";
 import { TopPerformingProperties } from "@/components/dashboard/TopPerformingProperties";
 import { MarketingFunnel } from "@/components/dashboard/MarketingFunnel";
+import { DataQualityWidget } from "@/components/dashboard/DataQualityWidget";
 
 interface DashboardStats {
   totalProperties: number;
@@ -282,9 +283,10 @@ export default function Dashboard() {
         <MaintenanceWidget />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <TopPerformingProperties />
         <MarketingFunnel />
+        <DataQualityWidget />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

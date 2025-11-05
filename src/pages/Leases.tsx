@@ -92,6 +92,29 @@ export default function Leases() {
     setTerminatingUnitId(unitId);
   };
 
+  const handleActivateLease = async (lease: Lease) => {
+    try {
+      const { error } = await supabase.rpc("sp_confirm_lease", {
+        p_unit_id: lease.unit_id,
+        p_tenant_id: lease.tenant_id,
+        p_start_date: lease.start_date,
+        p_end_date: lease.end_date,
+        p_deposit: lease.deposit || 0,
+      });
+
+      if (error) throw error;
+
+      // Delete the draft lease
+      await supabase.from("lease").delete().eq("lease_id", lease.lease_id);
+
+      toast.success("Lease activated successfully!");
+      fetchLeases();
+    } catch (error) {
+      console.error("Error activating lease:", error);
+      toast.error("Failed to activate lease");
+    }
+  };
+
   const generateRandomLeases = async (count: number) => {
     try {
       // Get available units and tenants
@@ -256,6 +279,15 @@ export default function Leases() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
+                      {lease.status === "draft" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleActivateLease(lease)}
+                        >
+                          Activate
+                        </Button>
+                      )}
                       {lease.status === "active" && (
                         <Button
                           variant="ghost"

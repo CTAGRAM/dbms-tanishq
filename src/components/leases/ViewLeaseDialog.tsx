@@ -1,7 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, DollarSign, FileText, User } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Calendar, DollarSign, FileText, User, AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Lease {
   lease_id: string;
@@ -39,6 +42,32 @@ interface ViewLeaseDialogProps {
 }
 
 export function ViewLeaseDialog({ lease, open, onOpenChange }: ViewLeaseDialogProps) {
+  const [unitStatus, setUnitStatus] = useState<string | null>(null);
+  const [statusMismatch, setStatusMismatch] = useState(false);
+
+  useEffect(() => {
+    const checkUnitStatus = async () => {
+      if (!lease) return;
+      
+      const { data } = await supabase
+        .from("unit")
+        .select("status")
+        .eq("unit_id", lease.unit?.name)
+        .single();
+
+      if (data) {
+        setUnitStatus(data.status);
+        // Check for mismatch: active lease should have LEASED unit
+        const hasMismatch = lease.status === "active" && data.status !== "LEASED";
+        setStatusMismatch(hasMismatch);
+      }
+    };
+
+    if (open && lease) {
+      checkUnitStatus();
+    }
+  }, [lease, open]);
+
   if (!lease) return null;
 
   const getStatusColor = (status: string) => {
@@ -77,6 +106,16 @@ export function ViewLeaseDialog({ lease, open, onOpenChange }: ViewLeaseDialogPr
         </DialogHeader>
 
         <div className="space-y-6">
+          {statusMismatch && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Status Mismatch Detected: This lease is active but the unit status is "{unitStatus}". 
+                The unit should be marked as "LEASED".
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-4">
               <div className="flex items-start gap-3">
