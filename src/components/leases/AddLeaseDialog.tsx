@@ -54,6 +54,8 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
   const [confirming, setConfirming] = useState(false);
   const [units, setUnits] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -73,7 +75,28 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
   }, [open]);
 
   const fetchUnitsAndTenants = async () => {
+    setAuthError(null);
+    setDataError(null);
+    
     try {
+      // Step 1: Check authentication state
+      const { data: { user }, error: authCheckError } = await supabase.auth.getUser();
+      
+      console.log("Auth check:", { user: user?.id, authCheckError });
+      
+      if (authCheckError || !user) {
+        const errorMsg = "Please sign in to create leases";
+        setAuthError(errorMsg);
+        console.error("Authentication required:", authCheckError);
+        toast({
+          title: "Authentication Required",
+          description: errorMsg,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Step 2: Fetch units and tenants
       const [{ data: unitsData, error: unitsError }, { data: tenantsData, error: tenantsError }] = await Promise.all([
         supabase
           .from("unit")
@@ -85,8 +108,23 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
           .order("created_at", { ascending: false }),
       ]);
 
+      // Step 3: Enhanced error logging
       if (unitsError) {
-        console.error("Units error:", unitsError);
+        console.error("Units error details:", {
+          message: unitsError.message,
+          code: unitsError.code,
+          details: unitsError.details,
+          hint: unitsError.hint,
+          userId: user.id
+        });
+        
+        // Check if it's an RLS issue
+        if (unitsError.code === 'PGRST301' || unitsError.message.includes('row-level security')) {
+          setDataError("You don't have permission to view available units. Please contact an administrator.");
+        } else {
+          setDataError(unitsError.message);
+        }
+        
         toast({
           title: "Error loading units",
           description: unitsError.message,
@@ -95,7 +133,14 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
       }
 
       if (tenantsError) {
-        console.error("Tenants error:", tenantsError);
+        console.error("Tenants error details:", {
+          message: tenantsError.message,
+          code: tenantsError.code,
+          details: tenantsError.details,
+          hint: tenantsError.hint,
+          userId: user.id
+        });
+        
         toast({
           title: "Error loading tenants", 
           description: tenantsError.message,
@@ -103,10 +148,25 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
         });
       }
 
+      // Step 4: Set data with debugging info
+      console.log("Data fetched:", { 
+        unitsCount: unitsData?.length || 0, 
+        tenantsCount: tenantsData?.length || 0,
+        hasUnitsError: !!unitsError,
+        hasTenantsError: !!tenantsError
+      });
+      
       setUnits(unitsData || []);
       setTenants(tenantsData || []);
+
+      // If no units but no error, it's genuinely empty
+      if (!unitsError && (!unitsData || unitsData.length === 0)) {
+        setDataError("No available units found. Please add properties with units first.");
+      }
+      
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Unexpected error fetching data:", error);
+      setDataError("An unexpected error occurred. Please try again.");
       toast({
         title: "Error",
         description: "Failed to load units and tenants",
@@ -206,7 +266,51 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
-        {!units.length || !tenants.length ? (
+        {authError ? (
+          <div className="py-8 text-center space-y-4">
+            <p className="text-destructive font-medium">{authError}</p>
+            <p className="text-muted-foreground text-sm">
+              You need to be signed in to create leases
+            </p>
+            <div className="flex gap-2 justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
+                Close
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setAuthError(null);
+                  fetchUnitsAndTenants();
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          </div>
+        ) : dataError ? (
+          <div className="py-8 text-center space-y-4">
+            <p className="text-destructive font-medium">{dataError}</p>
+            <div className="flex gap-2 justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
+                Close
+              </Button>
+              <Button
+                type="button"
+                onClick={fetchUnitsAndTenants}
+              >
+                Retry
+              </Button>
+            </div>
+          </div>
+        ) : !units.length || !tenants.length ? (
           <div className="py-8 text-center">
             <p className="text-muted-foreground mb-4">
               {!units.length 
