@@ -1,7 +1,37 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { GitMerge } from "lucide-react";
+import { GitMerge, Play } from "lucide-react";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function JoinExamples() {
+  const [results, setResults] = useState<Record<number, any[]>>({});
+  const [loading, setLoading] = useState<Record<number, boolean>>({});
+  const { toast } = useToast();
+
+  const executeQuery = async (index: number, queryFn: () => Promise<any>) => {
+    setLoading(prev => ({ ...prev, [index]: true }));
+    try {
+      const data = await queryFn();
+      setResults(prev => ({ ...prev, [index]: data }));
+      toast({
+        title: "Query Executed",
+        description: `Returned ${data.length} row(s)`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Query Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
   const joinExamples = [
     {
       type: "INNER JOIN",
@@ -16,6 +46,19 @@ FROM unit u
 INNER JOIN property p ON u.property_id = p.property_id
 WHERE u.status = 'AVAILABLE';`,
         explanation: "Get all available units with their property addresses"
+      },
+      executeFn: async () => {
+        const { data, error } = await supabase
+          .from('unit')
+          .select('name, rent_amount, property(address, city)')
+          .eq('status', 'AVAILABLE');
+        if (error) throw error;
+        return data.map((u: any) => ({
+          unit_name: u.name,
+          address: u.property?.address || 'N/A',
+          city: u.property?.city || 'N/A',
+          rent_amount: u.rent_amount
+        }));
       }
     },
     {
@@ -31,6 +74,18 @@ FROM property p
 LEFT JOIN unit u ON p.property_id = u.property_id
 GROUP BY p.property_id, p.address, p.city;`,
         explanation: "List all properties with their unit counts (even if they have no units)"
+      },
+      executeFn: async () => {
+        const { data, error } = await supabase
+          .from('property')
+          .select('address, city, unit(unit_id, status)');
+        if (error) throw error;
+        return data.map((p: any) => ({
+          address: p.address,
+          city: p.city,
+          total_units: p.unit?.length || 0,
+          leased_units: p.unit?.filter((u: any) => u.status === 'LEASED').length || 0
+        }));
       }
     },
     {
@@ -51,6 +106,21 @@ INNER JOIN tenant t ON l.tenant_id = t.tenant_id
 INNER JOIN profiles pr ON t.profile_id = pr.id
 WHERE l.status = 'active';`,
         explanation: "Get complete lease information with tenant, unit, and property details"
+      },
+      executeFn: async () => {
+        const { data, error } = await supabase
+          .from('lease')
+          .select('monthly_rent, start_date, end_date, unit(name, property(address)), tenant(profile_id, profiles(full_name))')
+          .eq('status', 'active');
+        if (error) throw error;
+        return data.map((l: any) => ({
+          tenant_name: l.tenant?.profiles?.full_name || 'N/A',
+          unit_name: l.unit?.name || 'N/A',
+          address: l.unit?.property?.address || 'N/A',
+          monthly_rent: l.monthly_rent,
+          start_date: l.start_date,
+          end_date: l.end_date
+        }));
       }
     },
     {
@@ -71,6 +141,20 @@ INNER JOIN unit u ON l.unit_id = u.unit_id
 LEFT JOIN payment pay ON l.lease_id = pay.lease_id
 GROUP BY pr.full_name, u.name, l.monthly_rent;`,
         explanation: "View lease payment summary (includes leases with no payments)"
+      },
+      executeFn: async () => {
+        const { data, error } = await supabase
+          .from('lease')
+          .select('monthly_rent, unit(name), tenant(profile_id, profiles(full_name)), payment(payment_id, status)');
+        if (error) throw error;
+        return data.map((l: any) => ({
+          tenant_name: l.tenant?.profiles?.full_name || 'N/A',
+          unit_name: l.unit?.name || 'N/A',
+          monthly_rent: l.monthly_rent,
+          total_payments: l.payment?.length || 0,
+          paid_payments: l.payment?.filter((p: any) => p.status === 'paid').length || 0,
+          pending_payments: l.payment?.filter((p: any) => p.status === 'pending').length || 0
+        }));
       }
     },
     {
@@ -93,6 +177,26 @@ INNER JOIN property p ON u.property_id = p.property_id
 WHERE m.status IN ('open', 'in_progress')
 ORDER BY m.priority ASC, m.created_at DESC;`,
         explanation: "List all open maintenance requests with location details"
+      },
+      executeFn: async () => {
+        const { data, error } = await supabase
+          .from('maintenance_request')
+          .select('category, priority, status, description, estimated_cost, created_at, unit(name, property(address, city))')
+          .in('status', ['open', 'in_progress'])
+          .order('priority', { ascending: true })
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data.map((m: any) => ({
+          address: m.unit?.property?.address || 'N/A',
+          city: m.unit?.property?.city || 'N/A',
+          unit_name: m.unit?.name || 'N/A',
+          category: m.category,
+          priority: m.priority,
+          status: m.status,
+          description: m.description?.substring(0, 50) + '...',
+          estimated_cost: m.estimated_cost || 0,
+          created_at: new Date(m.created_at).toLocaleDateString()
+        }));
       }
     },
     {
@@ -112,52 +216,69 @@ LEFT JOIN lease l ON u.unit_id = l.unit_id AND l.status = 'active'
 GROUP BY p.property_id, p.address, p.city, p.type
 ORDER BY monthly_revenue DESC;`,
         explanation: "Calculate monthly revenue for all properties (including those with $0)"
-      }
-    },
-    {
-      type: "SELF JOIN",
-      description: "Compare data within the same table",
-      example: {
-        query: `SELECT 
-  p1.address AS property_1,
-  p2.address AS property_2,
-  p1.city AS common_city,
-  ABS(p1.latitude - p2.latitude) + ABS(p1.longitude - p2.longitude) AS distance_approx
-FROM property p1
-INNER JOIN property p2 ON p1.city = p2.city AND p1.property_id < p2.property_id
-WHERE p1.latitude IS NOT NULL AND p2.latitude IS NOT NULL
-ORDER BY distance_approx ASC
-LIMIT 10;`,
-        explanation: "Find pairs of properties in the same city and their approximate distance"
-      }
-    },
-    {
-      type: "CROSS JOIN (Useful for Reports)",
-      description: "Generate combinations for reporting or analysis",
-      example: {
-        query: `SELECT 
-  p.address,
-  dates.month_start,
-  COALESCE(SUM(pay.amount), 0) AS revenue
-FROM property p
-CROSS JOIN (
-  SELECT generate_series(
-    DATE_TRUNC('month', CURRENT_DATE - INTERVAL '6 months'),
-    DATE_TRUNC('month', CURRENT_DATE),
-    '1 month'::INTERVAL
-  ) AS month_start
-) dates
-LEFT JOIN unit u ON p.property_id = u.property_id
-LEFT JOIN lease l ON u.unit_id = l.unit_id
-LEFT JOIN payment pay ON l.lease_id = pay.lease_id 
-  AND DATE_TRUNC('month', pay.paid_at) = dates.month_start
-  AND pay.status = 'paid'
-GROUP BY p.property_id, p.address, dates.month_start
-ORDER BY p.address, dates.month_start;`,
-        explanation: "Generate 6-month revenue report for each property (fills gaps with $0)"
+      },
+      executeFn: async () => {
+        const { data, error } = await supabase
+          .from('property')
+          .select('address, city, type, unit(unit_id, lease!inner(lease_id, monthly_rent, status))');
+        if (error) throw error;
+        return data.map((p: any) => {
+          const activeLeases = p.unit?.flatMap((u: any) => 
+            u.lease?.filter((l: any) => l.status === 'active') || []
+          ) || [];
+          return {
+            address: p.address,
+            city: p.city,
+            type: p.type,
+            total_units: p.unit?.length || 0,
+            active_leases: activeLeases.length,
+            monthly_revenue: activeLeases.reduce((sum: number, l: any) => sum + Number(l.monthly_rent || 0), 0)
+          };
+        });
       }
     }
   ];
+
+  const renderResults = (index: number) => {
+    const data = results[index];
+    if (!data || data.length === 0) return null;
+
+    const columns = Object.keys(data[0]);
+
+    return (
+      <div className="mt-4 border rounded-lg overflow-hidden">
+        <div className="bg-muted p-2 text-sm font-semibold">
+          Query Results ({data.length} rows)
+        </div>
+        <div className="overflow-x-auto max-h-96">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {columns.map((col) => (
+                  <TableHead key={col} className="capitalize">
+                    {col.replace(/_/g, ' ')}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((row, idx) => (
+                <TableRow key={idx}>
+                  {columns.map((col) => (
+                    <TableCell key={col}>
+                      {typeof row[col] === 'number' && col.includes('revenue')
+                        ? `$${row[col].toLocaleString()}`
+                        : row[col]?.toString() || 'N/A'}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -175,9 +296,19 @@ ORDER BY p.address, dates.month_start;`,
           <div className="space-y-6">
             {joinExamples.map((join, index) => (
               <div key={index} className="space-y-3">
-                <div>
-                  <h3 className="text-lg font-semibold text-primary">{join.type}</h3>
-                  <p className="text-sm text-muted-foreground">{join.description}</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-primary">{join.type}</h3>
+                    <p className="text-sm text-muted-foreground">{join.description}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => executeQuery(index, join.executeFn)}
+                    disabled={loading[index]}
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    {loading[index] ? "Running..." : "Execute"}
+                  </Button>
                 </div>
                 
                 <div className="rounded-lg bg-muted p-4 space-y-2">
@@ -189,6 +320,12 @@ ORDER BY p.address, dates.month_start;`,
                 <p className="text-sm text-foreground italic">
                   ✓ {join.example.explanation}
                 </p>
+
+                {loading[index] && (
+                  <Skeleton className="w-full h-32" />
+                )}
+
+                {renderResults(index)}
                 
                 {index < joinExamples.length - 1 && (
                   <div className="border-t pt-4" />
