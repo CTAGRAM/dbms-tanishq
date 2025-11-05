@@ -20,18 +20,60 @@ interface Property {
 export const OccupancyMap = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [loading, setLoading] = useState(true);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [mapInitialized, setMapInitialized] = useState(false);
   const { toast } = useToast();
 
+  const clearMarkers = () => {
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
+  };
+
+  const addMarkersToMap = (propertiesData: Property[]) => {
+    if (!map.current) return;
+
+    console.log('Adding markers to map:', propertiesData.length);
+    clearMarkers();
+
+    propertiesData.forEach((property) => {
+      if (property.latitude && property.longitude && map.current) {
+        const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
+          `<div class="p-2">
+            <h3 class="font-semibold">${property.address}</h3>
+            <p class="text-sm text-muted-foreground">${property.city}, ${property.state}</p>
+            <p class="text-sm"><span class="font-medium">Type:</span> ${property.type}</p>
+            <p class="text-sm"><span class="font-medium">Status:</span> ${property.status}</p>
+          </div>`
+        );
+
+        const marker = new mapboxgl.Marker({
+          color: property.status === 'active' ? '#3b82f6' : '#94a3b8'
+        })
+          .setLngLat([property.longitude, property.latitude])
+          .setPopup(popup)
+          .addTo(map.current);
+
+        markersRef.current.push(marker);
+      }
+    });
+  };
+
   useEffect(() => {
+    let isMounted = true;
+
     const initMap = async () => {
+      if (mapInitialized) {
+        console.log('Map already initialized, skipping...');
+        return;
+      }
+
       try {
         console.log('Starting map initialization...');
         
         // Fetch Mapbox API key
         const { data: keyData, error: keyError } = await supabase.functions.invoke('get-mapbox-key');
-        console.log('Mapbox key response:', { keyData, keyError });
         
         if (keyError) throw keyError;
         if (!keyData?.apiKey) throw new Error('No API key received');
@@ -43,20 +85,23 @@ export const OccupancyMap = () => {
           .not('latitude', 'is', null)
           .not('longitude', 'is', null);
 
-        console.log('Properties fetched:', propertiesData?.length, 'properties');
-
         if (propertiesError) throw propertiesError;
-        
-        setProperties(propertiesData || []);
 
-        if (!mapContainer.current) {
-          console.log('Map container not available');
+        if (!isMounted) return;
+
+        console.log('Properties fetched:', propertiesData?.length, 'properties');
+        
+        if (!propertiesData || propertiesData.length === 0) {
+          console.log('No properties with coordinates');
+          setProperties([]);
           setLoading(false);
           return;
         }
 
-        if ((propertiesData || []).length === 0) {
-          console.log('No properties with coordinates');
+        setProperties(propertiesData);
+
+        if (!mapContainer.current) {
+          console.log('Map container not available');
           setLoading(false);
           return;
         }
@@ -73,7 +118,9 @@ export const OccupancyMap = () => {
 
         // Remove existing map if any
         if (map.current) {
+          clearMarkers();
           map.current.remove();
+          map.current = null;
         }
 
         map.current = new mapboxgl.Map({
@@ -88,68 +135,92 @@ export const OccupancyMap = () => {
 
         // Wait for map to load before adding markers
         map.current.on('load', () => {
-          console.log('Map loaded, adding', propertiesData.length, 'markers');
-          
-          // Add markers for each property
-          propertiesData.forEach((property) => {
-            if (property.latitude && property.longitude && map.current) {
-              const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
-                `<div class="p-2">
-                  <h3 class="font-semibold">${property.address}</h3>
-                  <p class="text-sm text-muted-foreground">${property.city}, ${property.state}</p>
-                  <p class="text-sm"><span class="font-medium">Type:</span> ${property.type}</p>
-                  <p class="text-sm"><span class="font-medium">Status:</span> ${property.status}</p>
-                </div>`
-              );
-
-              // Create marker with default Mapbox pin style
-              new mapboxgl.Marker({
-                color: property.status === 'active' ? '#3b82f6' : '#94a3b8'
-              })
-                .setLngLat([property.longitude, property.latitude])
-                .setPopup(popup)
-                .addTo(map.current);
-              
-              console.log('Added marker for:', property.address);
-            }
-          });
-          
+          if (!isMounted) return;
+          console.log('Map loaded successfully');
+          addMarkersToMap(propertiesData);
+          setMapInitialized(true);
           setLoading(false);
         });
+
+        // Handle errors
+        map.current.on('error', (e) => {
+          console.error('Map error:', e);
+        });
+
       } catch (error) {
         console.error('Map initialization error:', error);
-        const errorMessage = error instanceof Error ? error.message : "Failed to load map";
-        toast({
-          title: "Map Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-        setLoading(false);
+        if (isMounted) {
+          const errorMessage = error instanceof Error ? error.message : "Failed to load map";
+          toast({
+            title: "Map Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          setLoading(false);
+        }
       }
     };
 
     initMap();
 
-    // Set up real-time subscription for property changes
+    // Set up real-time subscription - only update markers, don't reinitialize map
     const propertyChannel = supabase
       .channel('map-properties')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'property',
-        filter: 'latitude=not.is.null,longitude=not.is.null'
-      }, () => {
-        console.log('🔄 Property location changed, reinitializing map...');
-        initMap();
+        table: 'property'
+      }, async () => {
+        console.log('🔄 Property changed, updating markers...');
+        
+        try {
+          // Fetch updated properties
+          const { data: updatedProperties, error } = await supabase
+            .from('property')
+            .select('property_id, address, city, state, latitude, longitude, type, status')
+            .not('latitude', 'is', null)
+            .not('longitude', 'is', null);
+
+          if (error) throw error;
+
+          if (updatedProperties && isMounted) {
+            // Check if the number of properties with coordinates changed
+            const hasNewProperties = updatedProperties.length !== properties.length;
+            
+            if (hasNewProperties) {
+              console.log('New properties detected, reinitializing map...');
+              setMapInitialized(false);
+              setProperties([]);
+              // Trigger re-initialization
+              setTimeout(() => {
+                if (isMounted) {
+                  initMap();
+                }
+              }, 100);
+            } else {
+              // Just update the markers without reinitializing
+              console.log('Updating existing markers...');
+              setProperties(updatedProperties);
+              addMarkersToMap(updatedProperties);
+            }
+          }
+        } catch (error) {
+          console.error('Error updating properties:', error);
+        }
       })
       .subscribe();
 
     return () => {
+      isMounted = false;
       console.log('🔌 Cleaning up map and subscriptions...');
-      map.current?.remove();
+      clearMarkers();
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
       supabase.removeChannel(propertyChannel);
     };
-  }, [toast]);
+  }, [toast, properties.length, mapInitialized]);
 
   return (
     <Card>
