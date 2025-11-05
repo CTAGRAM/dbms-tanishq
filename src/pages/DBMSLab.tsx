@@ -6,6 +6,7 @@ import { UnitThree } from "@/components/dbms-lab/UnitThree";
 import { UnitFour } from "@/components/dbms-lab/UnitFour";
 import { UnitFive } from "@/components/dbms-lab/UnitFive";
 import { AuditReport } from "@/components/dbms-lab/AuditReport";
+import { JoinExamples } from "@/components/dbms-lab/JoinExamples";
 
 export default function DBMSLab() {
   return (
@@ -21,12 +22,13 @@ export default function DBMSLab() {
       </div>
 
       <Tabs defaultValue="unit1" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="unit1">Unit I</TabsTrigger>
           <TabsTrigger value="unit2">Unit II</TabsTrigger>
           <TabsTrigger value="unit3">Unit III</TabsTrigger>
           <TabsTrigger value="unit4">Unit IV</TabsTrigger>
           <TabsTrigger value="unit5">Unit V</TabsTrigger>
+          <TabsTrigger value="joins">JOINs</TabsTrigger>
           <TabsTrigger value="audit">Audit</TabsTrigger>
         </TabsList>
 
@@ -48,6 +50,10 @@ export default function DBMSLab() {
 
         <TabsContent value="unit5" className="space-y-4">
           <UnitFive />
+        </TabsContent>
+
+        <TabsContent value="joins" className="space-y-4">
+          <JoinExamples />
         </TabsContent>
 
         <TabsContent value="audit" className="space-y-4">
