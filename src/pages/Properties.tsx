@@ -28,6 +28,8 @@ interface Property {
   created_at: string;
   description?: string;
   image_url?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export default function Properties() {

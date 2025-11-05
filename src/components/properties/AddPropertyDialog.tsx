@@ -40,6 +40,9 @@ const formSchema = z.object({
   type: z.enum(["residential", "commercial", "industrial"]),
   status: z.enum(["active", "inactive", "maintenance"]).default("active"),
   description: z.string().max(500).optional(),
+  latitude: z.string().optional(),
+  longitude: z.string().optional(),
+  image_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -62,6 +65,9 @@ export function AddPropertyDialog({ onSuccess }: AddPropertyDialogProps) {
       type: "residential",
       status: "active",
       description: "",
+      latitude: "",
+      longitude: "",
+      image_url: "",
     },
   });
 
@@ -78,6 +84,9 @@ export function AddPropertyDialog({ onSuccess }: AddPropertyDialogProps) {
         type: data.type,
         status: data.status,
         description: data.description,
+        latitude: data.latitude ? parseFloat(data.latitude) : null,
+        longitude: data.longitude ? parseFloat(data.longitude) : null,
+        image_url: data.image_url || null,
         owner_id: user?.id
       };
       
@@ -240,6 +249,64 @@ export function AddPropertyDialog({ onSuccess }: AddPropertyDialogProps) {
                       className="resize-none"
                       rows={3}
                       {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="latitude"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Latitude (Optional)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="any"
+                        placeholder="37.7749" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="longitude"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Longitude (Optional)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="any"
+                        placeholder="-122.4194" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="image_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Image URL (Optional)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="url"
+                      placeholder="https://example.com/property-image.jpg" 
+                      {...field} 
                     />
                   </FormControl>
                   <FormMessage />
