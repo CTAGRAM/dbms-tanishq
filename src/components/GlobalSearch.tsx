@@ -46,88 +46,42 @@ export function GlobalSearch() {
 
     setLoading(true);
     try {
-      const searchTerm = `%${query}%`;
+      console.log('🔍 Executing global search for:', query);
       
-      const [properties, tenants, leases, payments, maintenance] = await Promise.all([
-        supabase
-          .from("property")
-          .select("property_id, address, city, type")
-          .or(`address.ilike.${searchTerm},city.ilike.${searchTerm}`)
-          .limit(5),
-        supabase
-          .from("tenant")
-          .select("tenant_id, profile_id, profiles(full_name, email)")
-          .limit(5),
-        supabase
-          .from("lease")
-          .select("lease_id, status, monthly_rent, unit(name)")
-          .limit(5),
-        supabase
-          .from("payment")
-          .select("payment_id, amount, status, due_date")
-          .limit(5),
-        supabase
-          .from("maintenance_request")
-          .select("request_id, description, status, category")
-          .or(`description.ilike.${searchTerm}`)
-          .limit(5),
-      ]);
-
-      const searchResults: SearchResult[] = [];
-
-      properties.data?.forEach((p: any) => {
-        searchResults.push({
-          type: "property",
-          id: p.property_id,
-          title: p.address,
-          subtitle: `${p.city} - ${p.type}`,
-          route: "/properties",
-        });
+      // Use the powerful SQL search function
+      const { data, error } = await supabase.rpc('global_search' as any, {
+        search_query: query,
+        search_limit: 20
       });
 
-      tenants.data?.forEach((t: any) => {
-        searchResults.push({
-          type: "tenant",
-          id: t.tenant_id,
-          title: t.profiles?.full_name || "Unknown",
-          subtitle: t.profiles?.email || "",
-          route: "/tenants",
-        });
-      });
+      if (error) {
+        console.error('Search error:', error);
+        throw error;
+      }
 
-      leases.data?.forEach((l: any) => {
-        searchResults.push({
-          type: "lease",
-          id: l.lease_id,
-          title: `Lease - ${l.unit?.name || "Unknown Unit"}`,
-          subtitle: `${l.status} - $${l.monthly_rent}/mo`,
-          route: "/leases",
-        });
-      });
+      console.log('✅ Search completed. Results found:', (data as any[])?.length || 0);
+      console.log('Search results:', data);
 
-      payments.data?.forEach((p: any) => {
-        searchResults.push({
-          type: "payment",
-          id: p.payment_id,
-          title: `Payment - $${p.amount}`,
-          subtitle: `${p.status} - Due ${new Date(p.due_date).toLocaleDateString()}`,
-          route: "/payments",
-        });
-      });
+      const resultsArray = (data as any[]) || [];
+      const searchResults: SearchResult[] = resultsArray.map((item: any) => ({
+        type: item.result_type as SearchResult['type'],
+        id: item.result_id,
+        title: item.title,
+        subtitle: item.subtitle,
+        route: item.route,
+      }));
 
-      maintenance.data?.forEach((m: any) => {
-        searchResults.push({
-          type: "maintenance",
-          id: m.request_id,
-          title: m.description.substring(0, 50) + "...",
-          subtitle: `${m.category} - ${m.status}`,
-          route: "/maintenance",
-        });
+      // Sort by relevance
+      searchResults.sort((a, b) => {
+        const aData: any = resultsArray.find((d: any) => d.result_id === a.id);
+        const bData: any = resultsArray.find((d: any) => d.result_id === b.id);
+        return (bData?.relevance || 0) - (aData?.relevance || 0);
       });
 
       setResults(searchResults);
     } catch (error) {
       console.error("Search error:", error);
+      setResults([]);
     } finally {
       setLoading(false);
     }

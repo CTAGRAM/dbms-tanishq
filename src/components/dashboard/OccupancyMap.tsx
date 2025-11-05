@@ -130,8 +130,24 @@ export const OccupancyMap = () => {
 
     initMap();
 
+    // Set up real-time subscription for property changes
+    const propertyChannel = supabase
+      .channel('map-properties')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'property',
+        filter: 'latitude=not.is.null,longitude=not.is.null'
+      }, () => {
+        console.log('🔄 Property location changed, reinitializing map...');
+        initMap();
+      })
+      .subscribe();
+
     return () => {
+      console.log('🔌 Cleaning up map and subscriptions...');
       map.current?.remove();
+      supabase.removeChannel(propertyChannel);
     };
   }, [toast]);
 

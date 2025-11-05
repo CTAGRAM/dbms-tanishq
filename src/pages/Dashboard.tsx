@@ -36,10 +36,63 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboardStats();
+
+    // Set up real-time subscriptions for all dashboard data
+    console.log('📡 Setting up real-time subscriptions for dashboard...');
+
+    const propertyChannel = supabase
+      .channel('dashboard-properties')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'property' }, () => {
+        console.log('🔄 Property changed, refreshing stats...');
+        fetchDashboardStats();
+      })
+      .subscribe();
+
+    const unitChannel = supabase
+      .channel('dashboard-units')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'unit' }, () => {
+        console.log('🔄 Unit changed, refreshing stats...');
+        fetchDashboardStats();
+      })
+      .subscribe();
+
+    const leaseChannel = supabase
+      .channel('dashboard-leases')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lease' }, () => {
+        console.log('🔄 Lease changed, refreshing stats...');
+        fetchDashboardStats();
+      })
+      .subscribe();
+
+    const paymentChannel = supabase
+      .channel('dashboard-payments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment' }, () => {
+        console.log('🔄 Payment changed, refreshing stats...');
+        fetchDashboardStats();
+      })
+      .subscribe();
+
+    const maintenanceChannel = supabase
+      .channel('dashboard-maintenance')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'maintenance_request' }, () => {
+        console.log('🔄 Maintenance request changed, refreshing stats...');
+        fetchDashboardStats();
+      })
+      .subscribe();
+
+    return () => {
+      console.log('🔌 Cleaning up real-time subscriptions...');
+      supabase.removeChannel(propertyChannel);
+      supabase.removeChannel(unitChannel);
+      supabase.removeChannel(leaseChannel);
+      supabase.removeChannel(paymentChannel);
+      supabase.removeChannel(maintenanceChannel);
+    };
   }, []);
 
   const fetchDashboardStats = async () => {
     try {
+      console.log('📊 Fetching dashboard stats...');
       const [properties, units, tenants, leases, payments, maintenance] = await Promise.all([
         supabase.from("property").select("property_id", { count: "exact", head: true }),
         supabase.from("unit").select("unit_id, status", { count: "exact" }),
@@ -81,6 +134,14 @@ export default function Dashboard() {
           revenue: generateSparkline(paidThisMonth),
           leases: generateSparkline(leases.count || 0),
         },
+      });
+      
+      console.log('✅ Dashboard stats updated:', {
+        properties: properties.count,
+        units: units.count,
+        tenants: tenants.count,
+        leases: leases.count,
+        maintenanceRequests: maintenance.count,
       });
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
