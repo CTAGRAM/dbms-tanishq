@@ -21,9 +21,9 @@ export const OccupancyMap = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const initializedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [properties, setProperties] = useState<Property[]>([]);
-  const [mapInitialized, setMapInitialized] = useState(false);
   const { toast } = useToast();
 
   const clearMarkers = () => {
@@ -32,7 +32,7 @@ export const OccupancyMap = () => {
   };
 
   const addMarkersToMap = (propertiesData: Property[]) => {
-    if (!map.current) return;
+    if (!map.current || !propertiesData) return;
 
     console.log('Adding markers to map:', propertiesData.length);
     clearMarkers();
@@ -61,14 +61,15 @@ export const OccupancyMap = () => {
   };
 
   useEffect(() => {
+    // Prevent re-initialization
+    if (initializedRef.current) {
+      console.log('Map already initialized, skipping init...');
+      return;
+    }
+
     let isMounted = true;
 
     const initMap = async () => {
-      if (mapInitialized) {
-        console.log('Map already initialized, skipping...');
-        return;
-      }
-
       try {
         console.log('Starting map initialization...');
         
@@ -116,13 +117,6 @@ export const OccupancyMap = () => {
 
         console.log('Initializing map at:', avgLng, avgLat);
 
-        // Remove existing map if any
-        if (map.current) {
-          clearMarkers();
-          map.current.remove();
-          map.current = null;
-        }
-
         map.current = new mapboxgl.Map({
           container: mapContainer.current,
           style: 'mapbox://styles/mapbox/light-v11',
@@ -136,19 +130,19 @@ export const OccupancyMap = () => {
         // Wait for map to load before adding markers
         map.current.on('load', () => {
           if (!isMounted) return;
-          console.log('Map loaded successfully');
+          console.log('✅ Map loaded successfully');
           addMarkersToMap(propertiesData);
-          setMapInitialized(true);
           setLoading(false);
+          initializedRef.current = true;
         });
 
         // Handle errors
         map.current.on('error', (e) => {
-          console.error('Map error:', e);
+          console.error('❌ Map error:', e);
         });
 
       } catch (error) {
-        console.error('Map initialization error:', error);
+        console.error('❌ Map initialization error:', error);
         if (isMounted) {
           const errorMessage = error instanceof Error ? error.message : "Failed to load map";
           toast({
@@ -163,14 +157,19 @@ export const OccupancyMap = () => {
 
     initMap();
 
-    // Set up real-time subscription - only update markers, don't reinitialize map
+    // Set up real-time subscription - only update markers
     const propertyChannel = supabase
-      .channel('map-properties')
+      .channel('map-properties-updates')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'property'
       }, async () => {
+        if (!initializedRef.current) {
+          console.log('Map not initialized yet, skipping update...');
+          return;
+        }
+
         console.log('🔄 Property changed, updating markers...');
         
         try {
@@ -183,26 +182,10 @@ export const OccupancyMap = () => {
 
           if (error) throw error;
 
-          if (updatedProperties && isMounted) {
-            // Check if the number of properties with coordinates changed
-            const hasNewProperties = updatedProperties.length !== properties.length;
-            
-            if (hasNewProperties) {
-              console.log('New properties detected, reinitializing map...');
-              setMapInitialized(false);
-              setProperties([]);
-              // Trigger re-initialization
-              setTimeout(() => {
-                if (isMounted) {
-                  initMap();
-                }
-              }, 100);
-            } else {
-              // Just update the markers without reinitializing
-              console.log('Updating existing markers...');
-              setProperties(updatedProperties);
-              addMarkersToMap(updatedProperties);
-            }
+          if (updatedProperties && isMounted && map.current) {
+            console.log('Updating markers with', updatedProperties.length, 'properties');
+            setProperties(updatedProperties);
+            addMarkersToMap(updatedProperties);
           }
         } catch (error) {
           console.error('Error updating properties:', error);
@@ -212,15 +195,10 @@ export const OccupancyMap = () => {
 
     return () => {
       isMounted = false;
-      console.log('🔌 Cleaning up map and subscriptions...');
-      clearMarkers();
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
+      console.log('🔌 Cleaning up map subscriptions...');
       supabase.removeChannel(propertyChannel);
     };
-  }, [toast, properties.length, mapInitialized]);
+  }, [toast]);
 
   return (
     <Card>
