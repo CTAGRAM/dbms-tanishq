@@ -105,14 +105,6 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
 
       setUnits(unitsData || []);
       setTenants(tenantsData || []);
-      
-      if (!unitsData?.length || !tenantsData?.length) {
-        toast({
-          title: "Missing data",
-          description: !unitsData?.length ? "No available units found. Please add properties with units first." : "No tenants found. Please add tenants first.",
-          variant: "destructive",
-        });
-      }
     } catch (error) {
       console.error("Error fetching data:", error);
       toast({
@@ -214,32 +206,48 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form className="space-y-4">
-            <FormField
-              control={form.control}
-              name="unit_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Available Unit</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a unit" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {units.map((unit) => (
-                        <SelectItem key={unit.unit_id} value={unit.unit_id}>
-                          {unit.name} - {unit.property?.address} (${unit.rent_amount}/mo)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+        {!units.length || !tenants.length ? (
+          <div className="py-8 text-center">
+            <p className="text-muted-foreground mb-4">
+              {!units.length 
+                ? "No available units found. Please add properties with units first." 
+                : "No tenants found. Please add tenants first."}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Close
+            </Button>
+          </div>
+        ) : (
+          <Form {...form}>
+            <form className="space-y-4">
+              <FormField
+                control={form.control}
+                name="unit_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Available Unit</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a unit" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {units.map((unit) => (
+                          <SelectItem key={unit.unit_id} value={unit.unit_id}>
+                            {unit.name} - {unit.property?.address} (${unit.rent_amount}/mo)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
             <FormField
               control={form.control}
@@ -337,6 +345,7 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
             </div>
           </form>
         </Form>
+        )}
       </DialogContent>
     </Dialog>
   );
