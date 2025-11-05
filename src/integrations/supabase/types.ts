@@ -660,6 +660,17 @@ export type Database = {
         Returns: number
       }
       get_current_isolation_level: { Args: never; Returns: string }
+      global_search: {
+        Args: { search_limit?: number; search_query: string }
+        Returns: {
+          relevance: number
+          result_id: string
+          result_type: string
+          route: string
+          subtitle: string
+          title: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
