@@ -71,11 +71,16 @@ export const OccupancyMap = () => {
 
         console.log('Initializing map at:', avgLng, avgLat);
 
+        // Remove existing map if any
+        if (map.current) {
+          map.current.remove();
+        }
+
         map.current = new mapboxgl.Map({
           container: mapContainer.current,
           style: 'mapbox://styles/mapbox/light-v11',
           center: [avgLng, avgLat],
-          zoom: 12,
+          zoom: 4,
         });
 
         // Add navigation controls
@@ -98,7 +103,7 @@ export const OccupancyMap = () => {
               );
 
               // Create marker with default Mapbox pin style
-              const marker = new mapboxgl.Marker({
+              new mapboxgl.Marker({
                 color: property.status === 'active' ? '#3b82f6' : '#94a3b8'
               })
                 .setLngLat([property.longitude, property.latitude])
