@@ -56,6 +56,7 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
   const [tenants, setTenants] = useState<any[]>([]);
   const [authError, setAuthError] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -74,29 +75,75 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
     }
   }, [open]);
 
-  const fetchUnitsAndTenants = async () => {
+  const fetchUnitsAndTenants = async (forceRefresh = false) => {
     setAuthError(null);
     setDataError(null);
     
     try {
-      // Step 1: Check authentication state
+      // Step 1: Verify session with detailed debugging
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      console.log("🔐 Session check:", { 
+        hasSession: !!session,
+        userId: session?.user?.id,
+        accessToken: session?.access_token ? 'present' : 'missing',
+        expiresAt: session?.expires_at,
+        sessionError,
+        forceRefresh
+      });
+      
+      // If no session or session error, try to refresh
+      if (!session || sessionError) {
+        if (forceRefresh) {
+          const errorMsg = "Session expired. Please sign in again.";
+          setAuthError(errorMsg);
+          toast({
+            title: "Authentication Required",
+            description: errorMsg,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Attempt session refresh
+        console.log("🔄 Attempting session refresh...");
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError || !refreshedSession) {
+          const errorMsg = "Please sign in to create leases";
+          setAuthError(errorMsg);
+          console.error("Session refresh failed:", refreshError);
+          toast({
+            title: "Authentication Required",
+            description: errorMsg,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        console.log("✅ Session refreshed successfully");
+        // Retry fetch with refreshed session
+        return fetchUnitsAndTenants(true);
+      }
+
+      // Step 2: Verify user is accessible
       const { data: { user }, error: authCheckError } = await supabase.auth.getUser();
       
-      console.log("Auth check:", { user: user?.id, authCheckError });
-      
       if (authCheckError || !user) {
-        const errorMsg = "Please sign in to create leases";
+        const errorMsg = "Authentication verification failed";
         setAuthError(errorMsg);
-        console.error("Authentication required:", authCheckError);
+        console.error("User verification failed:", authCheckError);
         toast({
-          title: "Authentication Required",
+          title: "Authentication Error",
           description: errorMsg,
           variant: "destructive",
         });
         return;
       }
 
-      // Step 2: Fetch units and tenants
+      console.log("✅ User verified:", user.id);
+
+      // Step 3: Fetch units and tenants with explicit auth header check
       const [{ data: unitsData, error: unitsError }, { data: tenantsData, error: tenantsError }] = await Promise.all([
         supabase
           .from("unit")
@@ -108,9 +155,9 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
           .order("created_at", { ascending: false }),
       ]);
 
-      // Step 3: Enhanced error logging
+      // Step 4: Analyze errors - distinguish between RLS and real errors
       if (unitsError) {
-        console.error("Units error details:", {
+        console.error("❌ Units query error:", {
           message: unitsError.message,
           code: unitsError.code,
           details: unitsError.details,
@@ -118,22 +165,32 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
           userId: user.id
         });
         
-        // Check if it's an RLS issue
-        if (unitsError.code === 'PGRST301' || unitsError.message.includes('row-level security')) {
-          setDataError("You don't have permission to view available units. Please contact an administrator.");
+        // Check if it's an authentication/RLS issue vs data issue
+        const isAuthIssue = unitsError.code === 'PGRST301' || 
+                           unitsError.message.toLowerCase().includes('jwt') ||
+                           unitsError.message.toLowerCase().includes('authentication') ||
+                           unitsError.message.toLowerCase().includes('row-level security');
+        
+        if (isAuthIssue) {
+          setAuthError("Authentication session issue. Please refresh and try again.");
+          toast({
+            title: "Session Error",
+            description: "Your session may have expired. Click 'Refresh Session' to retry.",
+            variant: "destructive",
+          });
         } else {
           setDataError(unitsError.message);
+          toast({
+            title: "Error loading units",
+            description: unitsError.message,
+            variant: "destructive",
+          });
         }
-        
-        toast({
-          title: "Error loading units",
-          description: unitsError.message,
-          variant: "destructive",
-        });
+        return;
       }
 
       if (tenantsError) {
-        console.error("Tenants error details:", {
+        console.error("❌ Tenants query error:", {
           message: tenantsError.message,
           code: tenantsError.code,
           details: tenantsError.details,
@@ -148,30 +205,62 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
         });
       }
 
-      // Step 4: Set data with debugging info
-      console.log("Data fetched:", { 
+      // Step 5: Set data with debugging info
+      console.log("✅ Data fetched successfully:", { 
         unitsCount: unitsData?.length || 0, 
-        tenantsCount: tenantsData?.length || 0,
-        hasUnitsError: !!unitsError,
-        hasTenantsError: !!tenantsError
+        tenantsCount: tenantsData?.length || 0
       });
       
       setUnits(unitsData || []);
       setTenants(tenantsData || []);
 
-      // If no units but no error, it's genuinely empty
+      // If no units but no error, it's genuinely empty (not an auth issue)
       if (!unitsError && (!unitsData || unitsData.length === 0)) {
         setDataError("No available units found. Please add properties with units first.");
       }
       
-    } catch (error) {
-      console.error("Unexpected error fetching data:", error);
+    } catch (error: any) {
+      console.error("❌ Unexpected error:", error);
       setDataError("An unexpected error occurred. Please try again.");
       toast({
         title: "Error",
-        description: "Failed to load units and tenants",
+        description: error.message || "Failed to load units and tenants",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleRefreshSession = async () => {
+    setRetrying(true);
+    setAuthError(null);
+    setDataError(null);
+    
+    try {
+      const { data: { session }, error } = await supabase.auth.refreshSession();
+      
+      if (error || !session) {
+        toast({
+          title: "Refresh Failed",
+          description: "Unable to refresh session. Please sign in again.",
+          variant: "destructive",
+        });
+        setAuthError("Session refresh failed. Please sign in again.");
+      } else {
+        toast({
+          title: "Session Refreshed",
+          description: "Retrying data fetch...",
+        });
+        await fetchUnitsAndTenants(true);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to refresh session",
+        variant: "destructive",
+      });
+      setAuthError("Session refresh error");
+    } finally {
+      setRetrying(false);
     }
   };
 
@@ -270,7 +359,7 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
           <div className="py-8 text-center space-y-4">
             <p className="text-destructive font-medium">{authError}</p>
             <p className="text-muted-foreground text-sm">
-              You need to be signed in to create leases
+              Your session may have expired or there's an authentication issue
             </p>
             <div className="flex gap-2 justify-center">
               <Button
@@ -282,12 +371,10 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
               </Button>
               <Button
                 type="button"
-                onClick={() => {
-                  setAuthError(null);
-                  fetchUnitsAndTenants();
-                }}
+                onClick={handleRefreshSession}
+                disabled={retrying}
               >
-                Retry
+                {retrying ? "Refreshing..." : "Refresh Session & Retry"}
               </Button>
             </div>
           </div>
@@ -304,7 +391,7 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
               </Button>
               <Button
                 type="button"
-                onClick={fetchUnitsAndTenants}
+                onClick={() => fetchUnitsAndTenants()}
               >
                 Retry
               </Button>
