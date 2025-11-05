@@ -77,7 +77,7 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
       const [{ data: unitsData, error: unitsError }, { data: tenantsData, error: tenantsError }] = await Promise.all([
         supabase
           .from("unit")
-          .select("unit_id, name, property_id, rent_amount, property(address)")
+          .select("unit_id, name, property_id, rent_amount")
           .eq("status", "AVAILABLE"),
         supabase
           .from("tenant")
@@ -239,7 +239,7 @@ export function AddLeaseDialog({ onSuccess }: AddLeaseDialogProps) {
                       <SelectContent>
                         {units.map((unit) => (
                           <SelectItem key={unit.unit_id} value={unit.unit_id}>
-                            {unit.name} - {unit.property?.address} (${unit.rent_amount}/mo)
+                            {unit.name} (${unit.rent_amount}/mo)
                           </SelectItem>
                         ))}
                       </SelectContent>
