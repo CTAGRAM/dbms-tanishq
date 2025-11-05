@@ -94,6 +94,7 @@ export const generateRandomLease = (unitId: string, tenantId: string) => {
   const endDate = new Date(startDate);
   endDate.setFullYear(endDate.getFullYear() + randomInt(1, 2));
   
+  // Always create as draft - use sp_confirm_lease to activate
   return {
     unit_id: unitId,
     tenant_id: tenantId,
@@ -101,6 +102,6 @@ export const generateRandomLease = (unitId: string, tenantId: string) => {
     end_date: endDate.toISOString().split('T')[0],
     monthly_rent: randomInt(800, 3500),
     deposit: randomInt(1000, 5000),
-    status: random(["draft", "active"] as const) as "draft" | "active"
+    status: "draft" as const
   };
 };

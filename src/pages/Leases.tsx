@@ -112,15 +112,47 @@ export default function Leases() {
       }
 
       const leasesToCreate = Math.min(count, units.length, tenants.length);
+      
+      // Generate lease data (all as drafts)
       const leasesData = Array.from({ length: leasesToCreate }, (_, i) =>
         generateRandomLease(units[i].unit_id, tenants[i].tenant_id)
       );
 
-      const { error } = await supabase.from("lease").insert(leasesData);
+      // Insert leases as drafts
+      const { data: insertedLeases, error: insertError } = await supabase
+        .from("lease")
+        .insert(leasesData)
+        .select("lease_id, unit_id, tenant_id, start_date, end_date, deposit");
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
-      toast.success(`Generated ${leasesToCreate} random leases`);
+      // Randomly activate 70% of leases using sp_confirm_lease
+      let activatedCount = 0;
+      if (insertedLeases) {
+        const leasesToActivate = insertedLeases.filter(() => Math.random() < 0.7);
+        
+        for (const lease of leasesToActivate) {
+          try {
+            const { error: confirmError } = await supabase.rpc("sp_confirm_lease", {
+              p_unit_id: lease.unit_id,
+              p_tenant_id: lease.tenant_id,
+              p_start_date: lease.start_date,
+              p_end_date: lease.end_date,
+              p_deposit: lease.deposit || 0,
+            });
+            
+            if (!confirmError) {
+              activatedCount++;
+              // Delete the draft lease since sp_confirm_lease creates a new active one
+              await supabase.from("lease").delete().eq("lease_id", lease.lease_id);
+            }
+          } catch (confirmError) {
+            console.warn("Failed to activate lease:", confirmError);
+          }
+        }
+      }
+
+      toast.success(`Generated ${leasesToCreate} leases (${activatedCount} active, ${leasesToCreate - activatedCount} drafts)`);
       fetchLeases();
     } catch (error) {
       console.error("Error generating leases:", error);

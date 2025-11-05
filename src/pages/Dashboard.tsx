@@ -102,6 +102,7 @@ export default function Dashboard() {
         supabase.from("maintenance_request").select("request_id", { count: "exact" }).eq("status", "open"),
       ]);
 
+      const totalUnits = units.count || 0;
       const occupiedUnits = units.data?.filter((u) => u.status === "LEASED").length || 0;
       const pendingPayments = payments.data?.filter((p) => p.status === "pending").length || 0;
       const overduePayments = payments.data?.filter(
@@ -112,15 +113,23 @@ export default function Dashboard() {
         (p) => p.status === "paid" && new Date(p.due_date).getMonth() === new Date().getMonth()
       ).reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0) || 0;
 
+      // Calculate occupancy percentage safely
+      const occupancyPercentage = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
+
       // Generate sparkline data (last 7 days trend)
       const generateSparkline = (baseValue: number) => 
         Array.from({ length: 7 }, () => ({ 
-          value: baseValue + Math.random() * (baseValue * 0.2) - (baseValue * 0.1) 
+          value: Math.max(0, baseValue + Math.random() * (baseValue * 0.2) - (baseValue * 0.1))
         }));
+
+      // Detect data quality issues
+      if (leases.count && leases.count > 0 && occupiedUnits === 0) {
+        console.warn('⚠️ Data integrity issue: Active leases exist but no units marked as LEASED');
+      }
 
       setStats({
         totalProperties: properties.count || 0,
-        totalUnits: units.count || 0,
+        totalUnits,
         occupiedUnits,
         totalTenants: tenants.count || 0,
         activeLeases: leases.count || 0,
@@ -130,7 +139,7 @@ export default function Dashboard() {
         monthlyRevenue: paidThisMonth,
         sparklineData: {
           properties: generateSparkline(properties.count || 0),
-          occupancy: generateSparkline((occupiedUnits / (units.count || 1)) * 100),
+          occupancy: generateSparkline(occupancyPercentage),
           revenue: generateSparkline(paidThisMonth),
           leases: generateSparkline(leases.count || 0),
         },
@@ -169,7 +178,10 @@ export default function Dashboard() {
     );
   }
 
-  const occupancyRate = stats ? (stats.occupiedUnits / stats.totalUnits) * 100 : 0;
+  // Calculate occupancy rate safely to prevent NaN
+  const occupancyRate = stats && stats.totalUnits > 0 
+    ? (stats.occupiedUnits / stats.totalUnits) * 100 
+    : 0;
 
   return (
     <div className="p-6 space-y-6">

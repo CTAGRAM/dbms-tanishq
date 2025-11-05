@@ -573,6 +573,19 @@ export type Database = {
       }
     }
     Views: {
+      lease_unit_status_mismatches: {
+        Row: {
+          end_date: string | null
+          issue_type: string | null
+          lease_id: string | null
+          lease_status: Database["public"]["Enums"]["lease_status"] | null
+          start_date: string | null
+          unit_id: string | null
+          unit_name: string | null
+          unit_status: Database["public"]["Enums"]["unit_status"] | null
+        }
+        Relationships: []
+      }
       monthly_revenue_by_property: {
         Row: {
           address: string | null
