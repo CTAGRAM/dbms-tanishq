@@ -27,8 +27,11 @@ export const OccupancyMap = () => {
   useEffect(() => {
     const initMap = async () => {
       try {
+        console.log('Starting map initialization...');
+        
         // Fetch Mapbox API key
         const { data: keyData, error: keyError } = await supabase.functions.invoke('get-mapbox-key');
+        console.log('Mapbox key response:', { keyData, keyError });
         
         if (keyError) throw keyError;
         if (!keyData?.apiKey) throw new Error('No API key received');
@@ -40,16 +43,26 @@ export const OccupancyMap = () => {
           .not('latitude', 'is', null)
           .not('longitude', 'is', null);
 
+        console.log('Properties fetched:', propertiesData?.length, 'properties');
+
         if (propertiesError) throw propertiesError;
         
         setProperties(propertiesData || []);
 
-        if (!mapContainer.current || (propertiesData || []).length === 0) {
+        if (!mapContainer.current) {
+          console.log('Map container not available');
+          setLoading(false);
+          return;
+        }
+
+        if ((propertiesData || []).length === 0) {
+          console.log('No properties with coordinates');
           setLoading(false);
           return;
         }
 
         // Initialize Mapbox
+        console.log('Setting Mapbox access token');
         mapboxgl.accessToken = keyData.apiKey;
 
         // Calculate center point from properties
