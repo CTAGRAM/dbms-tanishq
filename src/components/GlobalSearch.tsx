@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 interface SearchResult {
   type: "property" | "tenant" | "lease" | "payment" | "maintenance";
@@ -49,14 +50,21 @@ export function GlobalSearch() {
       console.log('🔍 Executing global search for:', query);
       
       // Use the powerful SQL search function
-      const { data, error } = await supabase.rpc('global_search' as any, {
+      const { data, error } = await supabase.rpc('global_search', {
         search_query: query,
         search_limit: 20
       });
 
       if (error) {
         console.error('Search error:', error);
-        throw error;
+        toast({
+          title: "Search Error",
+          description: error.message,
+          variant: "destructive",
+        });
+        setResults([]);
+        setLoading(false);
+        return;
       }
 
       console.log('✅ Search completed. Results found:', (data as any[])?.length || 0);
@@ -71,16 +79,15 @@ export function GlobalSearch() {
         route: item.route,
       }));
 
-      // Sort by relevance
-      searchResults.sort((a, b) => {
-        const aData: any = resultsArray.find((d: any) => d.result_id === a.id);
-        const bData: any = resultsArray.find((d: any) => d.result_id === b.id);
-        return (bData?.relevance || 0) - (aData?.relevance || 0);
-      });
-
+      console.log('Mapped search results:', searchResults);
       setResults(searchResults);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Search error:", error);
+      toast({
+        title: "Search Error",
+        description: error.message || "Failed to search",
+        variant: "destructive",
+      });
       setResults([]);
     } finally {
       setLoading(false);
@@ -125,27 +132,24 @@ export function GlobalSearch() {
         <CommandList>
           {loading ? (
             <div className="py-6 text-center text-sm text-muted-foreground">Searching...</div>
+          ) : results.length === 0 ? (
+            <CommandEmpty>No results found.</CommandEmpty>
           ) : (
-            <>
-              <CommandEmpty>No results found.</CommandEmpty>
-              {results.length > 0 && (
-                <CommandGroup heading="Results">
-                  {results.map((result) => (
-                    <CommandItem
-                      key={result.id}
-                      onSelect={() => handleSelect(result)}
-                      className="cursor-pointer"
-                    >
-                      {getIcon(result.type)}
-                      <div className="ml-2">
-                        <div className="text-sm font-medium">{result.title}</div>
-                        <div className="text-xs text-muted-foreground">{result.subtitle}</div>
-                      </div>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              )}
-            </>
+            <CommandGroup heading={`${results.length} Result${results.length !== 1 ? 's' : ''}`}>
+              {results.map((result) => (
+                <CommandItem
+                  key={result.id}
+                  onSelect={() => handleSelect(result)}
+                  className="cursor-pointer"
+                >
+                  {getIcon(result.type)}
+                  <div className="ml-2 flex-1">
+                    <div className="text-sm font-medium">{result.title}</div>
+                    <div className="text-xs text-muted-foreground">{result.subtitle}</div>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
           )}
         </CommandList>
       </CommandDialog>
