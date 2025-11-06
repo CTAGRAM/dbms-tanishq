@@ -129,8 +129,59 @@ export default function Leases() {
         .select("tenant_id")
         .limit(count);
 
-      if (!units?.length || !tenants?.length) {
-        toast.error("Need available units and tenants to create leases");
+      // Check if we need to generate units first
+      if (!units?.length) {
+        const { data: properties } = await supabase
+          .from("property")
+          .select("property_id")
+          .limit(Math.ceil(count / 3));
+
+        if (!properties?.length) {
+          toast.error("No properties found. Create properties first.");
+          return;
+        }
+
+        toast.info("No units found. Generating units first...");
+        
+        // Generate units for properties
+        const unitsToCreate = properties.flatMap((prop) =>
+          Array.from({ length: 3 }, (_, i) => ({
+            property_id: prop.property_id,
+            name: `Unit ${String.fromCharCode(65 + i)}`,
+            bedrooms: Math.floor(Math.random() * 3) + 1,
+            bathrooms: Math.floor(Math.random() * 2) + 1,
+            square_feet: Math.floor(Math.random() * 800) + 600,
+            rent_amount: Math.floor(Math.random() * 1000) + 1000,
+            status: "AVAILABLE" as const,
+          }))
+        );
+
+        const { error: unitError } = await supabase
+          .from("unit")
+          .insert(unitsToCreate);
+
+        if (unitError) throw unitError;
+
+        toast.success(`Created ${unitsToCreate.length} units`);
+        
+        // Re-fetch units
+        const { data: newUnits } = await supabase
+          .from("unit")
+          .select("unit_id")
+          .eq("status", "AVAILABLE")
+          .limit(count);
+
+        if (!newUnits?.length) {
+          toast.error("Failed to create units");
+          return;
+        }
+
+        // Use the new units
+        return generateRandomLeases(count);
+      }
+
+      if (!tenants?.length) {
+        toast.error("No tenants found. Create tenants first.");
         return;
       }
 
